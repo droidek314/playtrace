@@ -6,8 +6,8 @@ export_presets.cfg
 # GdUnit4 reports
 reports/
 # .NET
-bin/
-obj/
+server/**/bin/
+server/**/obj/
 *.user
 TestResults/
 # OS / editors

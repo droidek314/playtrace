@@ -11,8 +11,8 @@ jobs:
   gdscript-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install gdtoolkit==4.5.0
@@ -24,7 +24,7 @@ jobs:
   gdunit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Godot from .godot-version
         run: |
           v=$(cat .godot-version)
@@ -35,7 +35,7 @@ jobs:
         run: $GODOT_BIN --headless --path . --import
       - name: Run GdUnit4
         run: bash addons/gdUnit4/runtest.sh --headless --ignoreHeadlessMode -a res://tests
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: gdunit-reports
@@ -47,8 +47,8 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: server/global.json
       - run: dotnet test
@@ -56,13 +56,13 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t playtrace-server server
 
   docs-links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: lycheeverse/lychee-action@v2
         with:
           args: --offline --no-progress --exclude-path addons/gdUnit4 './**/*.md'
