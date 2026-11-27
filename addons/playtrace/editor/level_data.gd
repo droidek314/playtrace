@@ -60,30 +60,13 @@ func add_session(events: Array) -> void:
 static func load_dirs(dirs: Array[String], level_id: String) -> PlaytraceLevelData:
 	var data := PlaytraceLevelData.new(level_id)
 	for dir: String in dirs:
-		if not DirAccess.dir_exists_absolute(dir):
-			continue
-		for f: String in DirAccess.get_files_at(dir):
-			if f.get_extension() == "jsonl":
-				data.add_session(_read_events(dir.path_join(f)))
+		for path: String in PlaytraceSessionReader.list_sessions(dir):
+			var session := PlaytraceSessionReader.read_file(path)
+			for w: String in session.warnings:
+				push_warning(w)
+			data.add_session(session.events)
 	return data
 
 
 static func _is_number(v: Variant) -> bool:
 	return v is float or v is int
-
-
-# shortcut: minimal JSONL parse until PlaytraceSessionReader.read_file() lands in M2;
-# then replace with PlaytraceSessionReader.read_file(path).events (it also warns on bad lines).
-static func _read_events(path: String) -> Array:
-	var events: Array = []
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		push_warning("Playtrace: cannot open session file %s" % path)
-		return events
-	var json := JSON.new()
-	while not f.eof_reached():
-		var line := f.get_line()
-		if line.is_empty() or json.parse(line) != OK or not json.data is Dictionary:
-			continue
-		events.append(json.data)
-	return events
