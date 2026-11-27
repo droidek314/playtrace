@@ -90,6 +90,28 @@ func test_standing_still_counts_at_the_earlier_sample() -> void:
 	assert_float(grid.value_at(Vector2(70, 0))).is_equal_approx(mid, mid * 0.05)
 
 
+# The fast splat (used for large data) must keep the mass and match the exact splat closely
+# once many paths overlap: 100 runs along the same route at 220 px/s, sampled at the same spots.
+func test_fast_splat_matches_exact_on_many_paths() -> void:
+	var data := PlaytraceLevelData.new("l")
+	for s in 100:
+		var pts := PackedVector2Array()
+		var times := PackedFloat64Array()
+		for i in 40:
+			pts.append(Vector2(64 + i * 44, 432 - i * 3))
+			times.append(i * 0.2)
+		times.append(40 * 0.2)
+		data.add_path(pts, times)
+	var exact := PlaytraceDensityGrid.build_level(data, 16.0, PlaytraceDensityGrid.SPLAT_EXACT)
+	var fast := PlaytraceDensityGrid.build_level(data, 16.0, PlaytraceDensityGrid.SPLAT_FAST)
+	assert_float(fast.total()).is_equal_approx(exact.total(), exact.total() * 0.001)
+	var worst := 0.0
+	for x in range(200, 1600, 4):
+		var p := Vector2(x, 432 - (x - 64) * 3.0 / 44.0)
+		worst = maxf(worst, absf(fast.value_at(p) - exact.value_at(p)) / exact.value_at(p))
+	assert_float(worst).is_less(0.05)  # ~2 % in colour after the square-root curve
+
+
 func test_colours_normalise_to_the_99th_percentile() -> void:
 	var pts := PackedVector2Array()
 	for i in 400:

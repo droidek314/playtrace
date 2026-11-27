@@ -34,6 +34,16 @@ const MAX_CELLS := 1 << 20
 const CELLS_PER_SIGMA := 2.0
 ## Target distance between travel deposits along a path, in sigmas.
 const PATH_SPACING_SIGMA := 1.5
+## [method build_level] splat choice: fast only for large data.
+const SPLAT_AUTO := 0
+## [method build_level] splat choice: always exact (linear splat along the path).
+const SPLAT_EXACT := 1
+## [method build_level] splat choice: always fast (nearest cell, per-path offset).
+const SPLAT_FAST := 2
+## From this many travel deposits (and [constant FAST_MIN_PATHS] paths) on, paths use the fast splat.
+const FAST_MIN_DEPOSITS := 1000000
+## Fewest paths for the fast splat: its per-path patterns only average away over many paths.
+const FAST_MIN_PATHS := 64
 ## Most deposits per path segment (very long segments, like falls, may show faint beads above this).
 const MAX_DEPOSITS_PER_SEGMENT := 32
 ## Colours are scaled to this percentile of the non-empty cells, so one hot spot cannot wash out the rest.
@@ -58,6 +68,7 @@ var norm_value := 0.0
 var _sets: Array[PackedVector2Array] = []
 var _level: PlaytraceLevelData
 var _sigma_px := 1.0
+var _fast := false
 var _src := PackedFloat32Array()
 var _kernel := PackedFloat32Array()
 var _parts: Array[PackedFloat32Array] = []
@@ -84,13 +95,20 @@ static func build(
 
 ## Builds the time density of [param data]'s movement: travel along paths plus stays. The total mass is
 ## the recorded time in seconds. [code]data.bounds[/code] must hold every point (add_path keeps it so).
-static func build_level(data: PlaytraceLevelData, sigma_px: float) -> PlaytraceDensityGrid:
+## [param splat] picks how path deposits go into cells: [constant SPLAT_AUTO] (fast only for large data),
+## [constant SPLAT_EXACT] or [constant SPLAT_FAST]; see [method _bin_level_chunk].
+static func build_level(data: PlaytraceLevelData, sigma_px: float, splat: int = SPLAT_AUTO) -> PlaytraceDensityGrid:
 	if data.paths.is_empty():
 		return PlaytraceDensityGrid.new()
 	var grid := _new_grid(data.bounds, sigma_px)
 	grid._level = data
 	grid._sets = data.paths
 	grid._sigma_px = maxf(sigma_px, 0.5)
+	var length := 0.0
+	for l: float in data.path_length_px:
+		length += l
+	var big := data.paths.size() >= FAST_MIN_PATHS and length / (PATH_SPACING_SIGMA * sigma_px) >= FAST_MIN_DEPOSITS
+	grid._fast = splat == SPLAT_FAST or (splat == SPLAT_AUTO and big)
 	grid._parallel(grid._bin_level_chunk, mini(grid._jobs, data.paths.size()), "Playtrace density binning")
 	grid._level = null
 	grid._finish(sigma_px)
@@ -264,7 +282,11 @@ func _bin_level_chunk(chunk: int) -> void:
 	var s := chunk
 	while s < _sets.size():
 		var horizontal := _level.path_horizontal[s]
-		var pts := (shift_x if horizontal else shift_y) * _sets[s]
+		var xf := shift_x if horizontal else shift_y
+		if _fast:  # the path's sub-cell offset (see below), minus the half-cell shift across the path
+			var jitter := Vector2(fposmod(s * 0.6180339887, 1.0), fposmod(s * 0.7548776662, 1.0))
+			xf = Transform2D(0.0, Vector2.ONE, 0.0, jitter - (Vector2(0, 0.5) if horizontal else Vector2(0.5, 0))) * xf
+		var pts := xf * _sets[s]
 		var segments := pts.size() - 1
 		if segments > 0 and _level.path_travel_s[s] > 0.0:
 			var k := (
@@ -274,12 +296,19 @@ func _bin_level_chunk(chunk: int) -> void:
 			img.resize(pts.size() * k, 1, Image.INTERPOLATE_BILINEAR)
 			var deposits := img.get_data().to_vector2_array().slice(k / 2, pts.size() * k - k / 2)
 			var wt := _level.path_travel_s[s] / deposits.size()
-			# Linear splat along the path's main axis: each deposit is shared by its 2 nearest cell centres
-			# by distance, so its position along the path survives. Nearest-cell binning would snap
-			# deposits that are a fixed distance apart into a repeating pattern, which shows as bright and
-			# dark beats along busy paths. Across the path, rounding only shifts it by under half a cell.
-			# (A full 2D bilinear splat costs twice as much and broke the T21 budget.)
-			if horizontal:
+			# Two ways to put deposits into cells. Nearest-cell binning alone would snap deposits that sit a
+			# fixed distance apart into a repeating pattern, which shows as bright and dark beats along paths.
+			# - Exact (default): linear splat along the path's main axis; each deposit is shared by its 2
+			#   nearest cell centres by distance, so its position along the path survives. Across the path,
+			#   rounding only shifts it by under half a cell. (A full 2D bilinear splat costs twice as much.)
+			# - Fast (large data, T21): nearest cell, but each path is first moved by its own sub-cell offset
+			#   from a low-discrepancy sequence (deterministic). The paths' patterns are then out of phase and
+			#   average away over many paths; moving a path by under a cell is invisible after the blur.
+			#   About 1.5x faster, which keeps 1,000 x 10 min sessions well inside the 1 s budget.
+			if _fast:
+				for c: Vector2 in deposits:
+					local[int(c.y) * w + int(c.x)] += wt
+			elif horizontal:
 				for c: Vector2 in deposits:
 					var ix := int(c.x)
 					var i := int(c.y) * w + ix
@@ -320,13 +349,13 @@ func _blur(sigma_cells: float) -> void:
 	_parallel(_blur_cols_band, bands, "Playtrace density blur")
 	values = _join_bands()
 	_src = PackedFloat32Array()
-	var filled := PackedFloat32Array()
-	for v: float in values:
-		if v > 0.0:
-			filled.append(v)
-	filled.sort()
-	max_value = filled[-1] if not filled.is_empty() else 0.0
-	norm_value = filled[int((filled.size() - 1) * NORM_PERCENTILE)] if not filled.is_empty() else 0.0
+	# Max and percentile from one C++ sort; bsearch skips the empty cells (values are never negative).
+	var sorted := values.duplicate()
+	sorted.sort()
+	var first := sorted.bsearch(0.0, false)
+	var filled := sorted.size() - first
+	max_value = sorted[-1] if filled > 0 else 0.0
+	norm_value = sorted[first + int((filled - 1) * NORM_PERCENTILE)] if filled > 0 else 0.0
 
 
 # Horizontal pass for one band of rows: scatter each non-empty cell along its row.
