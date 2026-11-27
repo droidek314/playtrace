@@ -1,5 +1,10 @@
 ; Engine configuration file.
-; Playtrace development project: the repo root is the Godot project (D-005).
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -8,6 +13,10 @@ config_version=5
 config/name="Playtrace"
 config/features=PackedStringArray("4.7")
 
+[autoload]
+
+Playtrace="*uid://djsw71hx5rvg"
+
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/playtrace/plugin.cfg")

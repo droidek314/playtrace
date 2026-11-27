@@ -17,3 +17,5 @@ Dated log of design decisions. One line each: date, ID, decision, reason. Sectio
 | 2026-11-27 | D-011 | Docker-dependent steps run only in GitHub Actions. | Docker is not installed on the dev machine. |
 | 2026-11-27 | D-012 | GitHub repo is public, permanently. | Owner decision; needed for the Asset Library and free CI minutes. |
 | 2026-11-27 | D-013 | Session list items use `levels: string[]`; `limit` defaults to 100, max 500; `next` is null when no more items. | Spec 6.4 wrote "level(s)" and gave no limit bounds. |
+| 2026-11-27 | D-014 | Doc ownership: editor agent owns `HOW_IT_WORKS.md` (heatmap/overlay parts) and `ARCHITECTURE.md` (editor parts); server agent owns `SERVER.md` and `SELF_HOSTING.md`; the lead owns everything else in `docs/`. | Two agents editing the same doc file would conflict; each writes the docs for the code it builds (spec 15). |
+| 2026-11-27 | D-015 | The lead builds `demo/sandbox.tscn` together with the generator (moved from WS-E). | The generator's planted positions must match the sandbox layout exactly; one owner keeps them in sync. |

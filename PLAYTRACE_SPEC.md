@@ -557,3 +557,5 @@ These override anything above that disagrees. The same entries are in `docs/DECI
 | D-011 | No Docker locally: Docker-dependent work (image build, Testcontainers) runs in GitHub Actions. |
 | D-012 | The GitHub repo `droidek314/playtrace` is public, permanently. |
 | D-013 | `GET /v1/sessions` items use `levels: string[]`; `limit` default 100, max 500; `next` is null when there are no more items. See `docs/openapi.yaml`. |
+| D-014 | Doc ownership in Phase 1: editor agent owns `docs/HOW_IT_WORKS.md` (heatmap/overlay parts) and `docs/ARCHITECTURE.md` (editor parts); server agent owns `docs/SERVER.md`, `docs/SELF_HOSTING.md`; the lead owns the rest of `docs/`. |
+| D-015 | `demo/sandbox.tscn` is built by the lead together with the generator (moved from WS-E), so planted positions match the level. |
