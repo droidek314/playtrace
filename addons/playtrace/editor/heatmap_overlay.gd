@@ -34,7 +34,7 @@ var palette := PlaytraceHeatmapPalette.MAGMA:
 		palette = v
 		_request(false)
 ## Gaussian kernel sigma in world pixels.
-var kernel_radius_px := 24.0:
+var kernel_radius_px := 32.0:
 	set(v):
 		kernel_radius_px = maxf(v, 1.0)
 		_request(false)
