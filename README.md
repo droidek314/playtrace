@@ -10,10 +10,11 @@ Playtrace is a free, open-source Godot 4 plugin that shows where playtesters die
 
 ## Status
 
-Phase 1. Done: the recorder (M1), the shared reader and session generator (M2), the heatmap overlay (M3), and the collection server (M6, server side). See [PLAYTRACE_SPEC.md](PLAYTRACE_SPEC.md) for the full plan.
+Phase 1. Done: the recorder (M1), the shared reader and session generator (M2), the heatmap overlay (M3), the editor dock with insights (M4), and the collection server (M6, server side). See [PLAYTRACE_SPEC.md](PLAYTRACE_SPEC.md) for the full plan.
 
 ## Documentation
 
+- [User guide](docs/USER_GUIDE.md): every overlay layer and dock tab, insights, troubleshooting
 - [Manual integration](docs/MANUAL_INTEGRATION.md): the `Playtrace` API, every setting, auto-detection rules, setup warnings
 - [Contracts](docs/CONTRACTS.md): session file format, GDScript API, settings, server API
 - [Decisions](docs/DECISIONS.md): design decisions and their reasons

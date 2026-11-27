@@ -100,6 +100,11 @@ Section 12 of [PLAYTRACE_SPEC.md](../PLAYTRACE_SPEC.md) defines the test IDs (T0
 | T19 | Golden heatmap image | `tests/editor/planted_test.gd` |
 | T20 | World → overlay transform at zoom 0.25/1/4 and after pan | `tests/editor/overlay_transform_test.gd` |
 | T21 | 1,000 × 10 min computed off the main thread in < 1 s | `tests/editor/heatmap_perf_test.gd` |
+| T22 | Each Sessions filter returns exactly the expected fixtures | `tests/editor/session_filter_test.gd` |
+| T23 | Insights for a fixed seed match `planted.json` | `tests/editor/insights_test.gd` |
+| T24 | Badge counts equal the sum of merged markers at every zoom | `tests/editor/marker_clusters_test.gd` |
+| T25 | Dock/layer settings survive save and reload | `tests/editor/editor_config_test.gd` |
+| T26 | Each `setup_health` fixture triggers its warning exactly once | `tests/editor/setup_health_test.gd` |
 
 `tests/shared/generator_test.gd` also checks that every planted feature is present in 200 generated sessions, and `tests/shared/sandbox_test.gd` checks that the sandbox loads and its player stands on the ground. Other IDs are added to this table as their milestones land.
 

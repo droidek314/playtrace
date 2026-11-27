@@ -41,7 +41,15 @@ Three folders with a strict rule: `runtime/` and `shared/` must never reference 
 | `editor/heatmap_palette.gd` | `PlaytraceHeatmapPalette`: magma-like and viridis gradients; turns a grid into a transparent RGBA image. |
 | `editor/overlay_transform.gd` | `PlaytraceOverlayTransform`: world → viewport-pixel mapping from the editor's canvas transform. |
 | `editor/heatmap_overlay.gd` | `PlaytraceHeatmapOverlay`: layer state (opacity, palette, radius), background recompute, and drawing of the heatmap and death marks. |
-| `editor/heatmap_toolbar.gd` | `PlaytraceHeatmapToolbar`: the M3 controls in the 2D editor toolbar. The full dock arrives in M4. |
+| `editor/heatmap_toolbar.gd` | `PlaytraceHeatmapToolbar`: the on/off switch and the session/death count in the 2D toolbar. |
+| `editor/dock.gd` | The **Playtrace** bottom panel: the Sessions, Layers, Insights, Setup and Server tabs. |
+| `editor/session_library.gd` | Reads each session file once into a small record (list row, events in the open level, health facts) so filters never re-read files. |
+| `editor/insights.gd` | Ranks death hotspots, the largest stuck zone, the most common quit point and never-visited floors. |
+| `editor/level_surfaces.gd` | Finds walkable floor tops (`StaticBody2D` rectangles, `TileMapLayer` cells) for the never-visited insight. |
+| `editor/marker_clusters.gd` | Groups markers that are closer than 18 px on screen into numbered badges. |
+| `editor/setup_health.gd` | Derives the three Setup health warnings (D-029) from sessions. |
+| `editor/editor_config.gd` | Saves dock and layer state in `res://.playtrace/settings.cfg`. |
+| `editor/overlay_export.gd` | Save PNG: renders the scene plus layers offscreen using the same drawing code as the editor. |
 
 ### How `outcome()` decides
 
