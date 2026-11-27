@@ -16,6 +16,8 @@ Phase 0 (repository, CI, frozen contracts). See [PLAYTRACE_SPEC.md](PLAYTRACE_SP
 
 - [Contracts](docs/CONTRACTS.md): session file format, GDScript API, settings, server API
 - [Decisions](docs/DECISIONS.md): design decisions and their reasons
+- [How it works](docs/HOW_IT_WORKS.md): from recorded events to the heatmap
+- [Architecture](docs/ARCHITECTURE.md): components, threading, runtime/editor boundary
 - [Testing](docs/TESTING.md): how to run every test suite
 - [Codebase tour](docs/CODEBASE.md): what each file does
 - [Self-hosting](docs/SELF_HOSTING.md): run the collection server with Docker

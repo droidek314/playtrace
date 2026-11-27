@@ -87,7 +87,7 @@ Install → enable plugin → press Play → heatmap with deaths. No code, no sc
 | --- | --- |
 | Engine support | Godot 4.4+ (2D) targeted; only the version in `.godot-version` (4.7.2) is tested in CI. Testing older 4.x versions is a later decision (D-008). |
 | Plugin language | GDScript only, static typing everywhere. No C#, no GDExtension. |
-| Editor integration | `EditorPlugin`: bottom dock + `_forward_canvas_draw_over_viewport()` overlay. |
+| Editor integration | `EditorPlugin`: bottom dock + `_forward_canvas_force_draw_over_viewport()` overlay (D-027). |
 | Heatmap compute | CPU density grid, Gaussian kernel, via `WorkerThreadPool`. |
 | Heatmap colouring | `Gradient` → `Image` → `ImageTexture`, linear filtering. Default palette magma-like; viridis option. |
 | Local storage | JSON Lines, one file per session: `user://playtrace/sessions/<session_id>.jsonl`. Note: a game run from the editor and the editor itself share the same `user://` dir, so local mode needs no transport. |
@@ -564,3 +564,5 @@ These override anything above that disagrees. The same entries are in `docs/DECI
 | D-018 | `outcome` everywhere (reader, server, editor) = whichever of `level_complete` / `quit` came last; `unknown` if neither. `duration_ms` = largest `t`. |
 | D-019 | Screenshot upload (M7) has no endpoint in 6.4 yet; a contract addition (e.g. `PUT /v1/sessions/{id}/screenshots/{n}.jpg`) is designed at the start of M7. |
 | D-020 | Server: keys are `pt_ingest_` / `pt_read_` + 32 random bytes (Base64url), stored as SHA-256 only; session ids unique per project; non-object event lines skipped, only a bad header gives 400; decompressed size capped at 16 MB (413); events stored as one `jsonb` array per session, so downloads have the same content but may differ in key order/spacing; migrations run on start. Details in `docs/SERVER.md`. |
+| D-027 | The overlay uses `set_force_draw_over_forwarding_enabled()` + `_forward_canvas_force_draw_over_viewport()`. The plain `_forward_canvas_draw_over_viewport()` only runs while the plugin handles the selected node, so the overlay would vanish when a normal node is selected. |
+| D-028 | `docs/` has a `.gdignore` so Godot doesn't import the doc images (the repo root is a Godot project). |

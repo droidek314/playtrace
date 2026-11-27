@@ -1,6 +1,6 @@
 # Codebase tour
 
-A file-by-file guide for contributors. For how the parts fit together, see `ARCHITECTURE.md` (written with M3). For the frozen interfaces, see [CONTRACTS.md](CONTRACTS.md).
+A file-by-file guide for contributors. For how the parts fit together, see [ARCHITECTURE.md](ARCHITECTURE.md). For the frozen interfaces, see [CONTRACTS.md](CONTRACTS.md).
 
 ## Where to start reading
 
@@ -34,7 +34,12 @@ Three folders with a strict rule: `runtime/` and `shared/` must never reference 
 | `shared/settings.gd` | `PlaytraceSettings`: every project settings key, `defaults()`, `register_defaults()` (adds missing keys to Project Settings) and `get_value(key)`. |
 | `shared/session.gd` | `PlaytraceSession`: one session in memory (`header`, `events`, `warnings`) plus helpers: `events_of_type()`, `levels()`, `duration_ms()`, `outcome()`. |
 | `shared/session_reader.gd` | `PlaytraceSessionReader`: `read_file(path)` never fails. It skips corrupt lines with one warning per file and ignores unknown event types. `list_sessions(dir)` returns sorted `.jsonl` paths. |
-| `editor/` | Overlay, heatmap, dock (M3 onward). |
+| `editor/level_data.gd` | `PlaytraceLevelData`: loads sessions with the reader and keeps the `pos` / `death` events recorded in the edited scene's level. |
+| `editor/density_grid.gd` | `PlaytraceDensityGrid`: Gaussian density grid computed on `WorkerThreadPool`. Pure math; see [HOW_IT_WORKS.md](HOW_IT_WORKS.md). |
+| `editor/heatmap_palette.gd` | `PlaytraceHeatmapPalette`: magma-like and viridis gradients; turns a grid into a transparent RGBA image. |
+| `editor/overlay_transform.gd` | `PlaytraceOverlayTransform`: world → viewport-pixel mapping from the editor's canvas transform. |
+| `editor/heatmap_overlay.gd` | `PlaytraceHeatmapOverlay`: layer state (opacity, palette, radius), background recompute, and drawing of the heatmap and death marks. |
+| `editor/heatmap_toolbar.gd` | `PlaytraceHeatmapToolbar`: the M3 controls in the 2D editor toolbar. The full dock arrives in M4. |
 
 ### How `outcome()` decides
 

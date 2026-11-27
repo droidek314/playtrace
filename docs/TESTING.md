@@ -65,7 +65,13 @@ If you move something in the sandbox level, update `planted.json` to match. The 
 
 ## Golden images
 
-Added with M3 (heatmap). This section will explain how to regenerate them.
+T19 compares the seed-1 heatmap with [`tests/golden/heatmap_seed1_magma.png`](../tests/golden/heatmap_seed1_magma.png). It allows under 1 % differing pixels, with a ±3/255 per-channel tolerance. If you change the heatmap on purpose, regenerate the image and check it by eye before committing:
+
+```bash
+PLAYTRACE_UPDATE_GOLDEN=1 bash addons/gdUnit4/runtest.sh --godot_binary "$G" --headless --ignoreHeadlessMode -a res://tests/editor
+```
+
+The doc screenshots `docs/images/m3_*.png` come from `tests/golden/render_m3_overlay.gd`. It needs a GPU, so run it without `--headless`: `"$G" --path . --script res://tests/golden/render_m3_overlay.gd`.
 
 ## Test IDs
 
@@ -76,5 +82,11 @@ Section 12 of [PLAYTRACE_SPEC.md](../PLAYTRACE_SPEC.md) defines the test IDs (T0
 | T01 | Pipeline smoke: lint, GdUnit4, xUnit | all suites; `tests/*/contract_test.gd`, `server/tests/.../HealthTests.cs` |
 | T14 | Generator determinism | `tests/shared/generator_test.gd` |
 | T15 | Reader robustness | `tests/shared/session_reader_test.gd` |
+| T16 | Density grid: peak in the right cell, total mass = event count | `tests/editor/density_grid_test.gd` |
+| T17 | Top death hotspot within 32 px of the planted cluster, seeds 1–20 | `tests/editor/planted_test.gd` |
+| T18 | Planted unvisited area < 1 % of max density | `tests/editor/planted_test.gd` |
+| T19 | Golden heatmap image | `tests/editor/planted_test.gd` |
+| T20 | World → overlay transform at zoom 0.25/1/4 and after pan | `tests/editor/overlay_transform_test.gd` |
+| T21 | 1,000 × 10 min computed off the main thread in < 1 s | `tests/editor/heatmap_perf_test.gd` |
 
 `tests/shared/generator_test.gd` also checks that every planted feature is present in 200 generated sessions, and `tests/shared/sandbox_test.gd` checks that the sandbox loads and its player stands on the ground. Other IDs are added to this table as their milestones land.

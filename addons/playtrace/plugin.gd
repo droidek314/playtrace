@@ -25,6 +25,7 @@ func _disable_plugin() -> void:
 
 
 func _enter_tree() -> void:
+	PlaytraceSettings.register_defaults()
 	_overlay = PlaytraceHeatmapOverlay.new()
 	_overlay.changed.connect(update_overlays)
 	_toolbar = PlaytraceHeatmapToolbar.new()
