@@ -5,7 +5,8 @@ extends SceneTree
 ## [codeblock]
 ## godot --path . --script res://tests/golden/render_m3_overlay.gd
 ## [/codeblock]
-## Writes docs/images/m3_overlay.png (whole level, zoom 0.75) and docs/images/m3_overlay_zoom400.png.
+## Writes docs/images/m3_overlay.png and m3_overlay_viridis.png (whole level, zoom 0.75) and
+## m3_overlay_zoom400.png (the quit point and hard step at 400 %), from 200 generated sessions, seed 1.
 
 const LEVEL := "res://demo/sandbox.tscn"
 const SESSIONS_DIR := "user://playtrace_render/m3"
@@ -21,16 +22,16 @@ func _run() -> void:
 		DirAccess.remove_absolute(f)
 	gen.write(1, 200, LEVEL, SESSIONS_DIR)
 	var data := PlaytraceLevelData.load_dirs([SESSIONS_DIR] as Array[String], LEVEL)
-	var result := PlaytraceHeatmapOverlay.compute(
-		data, PlaytraceHeatmapOverlay.new().kernel_radius_px, PlaytraceHeatmapPalette.MAGMA
-	)
-	var tex := ImageTexture.create_from_image(result["image"])
+	var sigma := PlaytraceHeatmapOverlay.new().kernel_radius_px
 	var shots := [
-		["res://docs/images/m3_overlay.png", Vector2i(1536, 384), 0.75, Vector2.ZERO],
-		["res://docs/images/m3_overlay_zoom400.png", Vector2i(960, 480), 4.0, Vector2(792, 372)],
+		["m3_overlay.png", PlaytraceHeatmapPalette.MAGMA, Vector2i(1584, 480), 0.75, Vector2(-32, -64)],
+		["m3_overlay_viridis.png", PlaytraceHeatmapPalette.VIRIDIS, Vector2i(1584, 480), 0.75, Vector2(-32, -64)],
+		["m3_overlay_zoom400.png", PlaytraceHeatmapPalette.MAGMA, Vector2i(960, 480), 4.0, Vector2(1080, 340)],
 	]
 	for shot: Array in shots:
-		await _shot(shot[0], shot[1], shot[2], shot[3], tex, result["rect"], data.deaths)
+		var result := PlaytraceHeatmapOverlay.compute(data, sigma, shot[1])
+		var tex := ImageTexture.create_from_image(result["image"])
+		await _shot("res://docs/images/" + shot[0], shot[2], shot[3], shot[4], tex, result["rect"], data.deaths)
 	print("Playtrace: rendered %d sessions, %d deaths" % [data.session_count, data.deaths.size()])
 	quit()
 
@@ -44,11 +45,13 @@ func _shot(
 	var xform := PlaytraceOverlayTransform.canvas_transform(zoom, offset)
 	var level: Node = load(LEVEL).instantiate()
 	level.process_mode = Node.PROCESS_MODE_DISABLED  # keep the player where the scene puts it
+	for cam: Node in level.find_children("*", "Camera2D", true, false):
+		cam.free()  # the player's camera would replace our canvas transform and misalign the layers
 	vp.add_child(level)
 	var layer := CanvasLayer.new()  # not moved by canvas_transform, like the editor overlay control
 	var overlay := Control.new()
 	overlay.size = size
-	overlay.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	overlay.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	overlay.draw.connect(func() -> void: PlaytraceHeatmapOverlay.draw_layers(overlay, xform, tex, rect, deaths, 0.65))
 	layer.add_child(overlay)
 	vp.add_child(layer)
