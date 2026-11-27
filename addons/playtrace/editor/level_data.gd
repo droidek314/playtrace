@@ -7,11 +7,32 @@ extends RefCounted
 ## [code]level_enter[/code]/[code]level_exit[/code] count, so a session that visits several levels
 ## contributes only its part in this one. The overlay compares [member level] with the edited
 ## scene's [code]scene_file_path[/code]. Safe to build on a worker thread.
+##
+## Movement is kept as time, not as sample counts, because the recorder writes a [code]pos[/code] only
+## after the player moved (contract 5): a long gap between samples is time spent standing still.
+## For consecutive samples a -> b with dt seconds, up to [constant MOVE_SAMPLE_S] is travel time along
+## a -> b ([member path_travel_s]); the rest is a stay at a ([member stay_points]). The last sample of a
+## path stays until the path ended. So every path adds exactly its duration to the heatmap.
+
+## Steps faster than this (px/s) are teleports (respawn, door, scripted move): the path is cut there.
+const TELEPORT_PX_S := 1500.0
+## Longest gap between samples counted as travel: the default pos interval (contract 6.3).
+const MOVE_SAMPLE_S := 0.2
 
 ## Level id these points belong to (a scene path in plug-and-play mode).
 var level := ""
-## Movement samples ([code]pos[/code] events), one array per session that entered the level.
+## Movement paths: unbroken runs of [code]pos[/code] samples, several per session.
 var paths: Array[PackedVector2Array] = []
+## For each path, its travel time in seconds (spread along the path by [PlaytraceDensityGrid]).
+var path_travel_s := PackedFloat64Array()
+## For each path, its length in world pixels (sets how finely the grid subdivides it).
+var path_length_px := PackedFloat64Array()
+## For each path, true when it runs more along x than along y (the grid splats along that axis).
+var path_horizontal: Array[bool] = []
+## Points where players stood still, with the seconds in [member stay_seconds].
+var stay_points := PackedVector2Array()
+## Seconds spent at each of [member stay_points].
+var stay_seconds := PackedFloat64Array()
 ## Death positions from all sessions.
 var deaths := PackedVector2Array()
 ## Number of sessions that entered the level.
@@ -20,6 +41,8 @@ var session_count := 0
 var bounds := Rect2()
 
 var _has_bounds := false
+var _pts := PackedVector2Array()
+var _ts := PackedFloat64Array()
 
 
 func _init(level_id: String = "") -> void:
@@ -27,33 +50,85 @@ func _init(level_id: String = "") -> void:
 
 
 ## Adds the part of one session's [param events] (contract 6.2 event dictionaries) played in [member level].
+## Path rules: a path is broken (never joined across) at [code]death[/code], [code]level_enter[/code],
+## [code]level_exit[/code], and at any step faster than [constant TELEPORT_PX_S]. A path ends at the time of
+## the event that broke it; a path still open when the session ends, at the session's last event in the
+## level (so the hesitation before a [code]quit[/code] counts). Other events are not part of the path.
 func add_session(events: Array) -> void:
 	var inside := false
 	var entered := false
-	var pts := PackedVector2Array()
+	var last_t := 0.0
 	for e: Variant in events:
 		if not e is Dictionary:
 			continue
 		var type: Variant = e.get("type")
-		if type == PlaytraceSchema.LEVEL_ENTER:
-			inside = e.get("level") == level
-			entered = entered or inside
-		elif type == PlaytraceSchema.LEVEL_EXIT:
-			inside = false
-		elif inside and (type == PlaytraceSchema.POS or type == PlaytraceSchema.DEATH):
-			var p: Variant = e.get("p")
-			if not p is Array or p.size() < 2 or not _is_number(p[0]) or not _is_number(p[1]):
-				continue
-			if type == PlaytraceSchema.POS:
-				var v := Vector2(p[0], p[1])
-				bounds = bounds.expand(v) if _has_bounds else Rect2(v, Vector2.ZERO)
-				_has_bounds = true
-				pts.append(v)
-			else:
-				deaths.append(Vector2(p[0], p[1]))
+		var t := float(e.get("t", 0)) / 1000.0
+		if type == PlaytraceSchema.LEVEL_ENTER or type == PlaytraceSchema.LEVEL_EXIT or type == PlaytraceSchema.DEATH:
+			if inside:
+				_end_path(t)
+			if type == PlaytraceSchema.LEVEL_ENTER:
+				inside = e.get("level") == level
+				entered = entered or inside
+			elif type == PlaytraceSchema.LEVEL_EXIT:
+				inside = false
+		if not inside:
+			continue
+		last_t = t
+		if type != PlaytraceSchema.POS and type != PlaytraceSchema.DEATH:
+			continue
+		var p: Variant = e.get("p")
+		if not p is Array or p.size() < 2 or not _is_number(p[0]) or not _is_number(p[1]):
+			continue
+		var v := Vector2(p[0], p[1])
+		if type == PlaytraceSchema.DEATH:
+			deaths.append(v)
+			continue
+		if not _pts.is_empty() and _pts[-1].distance_to(v) > TELEPORT_PX_S * (t - _ts[-1]):
+			_end_path(t)  # teleport: the time before the jump was spent at the last sample
+		_pts.append(v)
+		_ts.append(t)
+	if inside:
+		_end_path(last_t)
 	if entered:
 		session_count += 1
-		paths.append(pts)
+
+
+## Adds one unbroken path: [param points] with their [param times] in seconds, plus one extra time at the
+## end, when the path ended ([code]times.size() == points.size() + 1[/code]).
+func add_path(points: PackedVector2Array, times: PackedFloat64Array) -> void:
+	if points.is_empty() or times.size() != points.size() + 1:
+		return
+	var travel := 0.0
+	var length := 0.0
+	var along := Vector2.ZERO
+	for i in points.size():
+		var v := points[i]
+		bounds = bounds.expand(v) if _has_bounds else Rect2(v, Vector2.ZERO)
+		_has_bounds = true
+		var dt := times[i + 1] - times[i]
+		if i + 1 < points.size():
+			length += v.distance_to(points[i + 1])
+			along += (points[i + 1] - v).abs()
+			var move := minf(dt, MOVE_SAMPLE_S)
+			travel += move
+			dt -= move
+		if dt > 0.0:
+			stay_points.append(v)
+			stay_seconds.append(dt)
+	paths.append(points)
+	path_travel_s.append(travel)
+	path_length_px.append(length)
+	path_horizontal.append(along.x >= along.y)
+
+
+# Closes the open path at time end_t (never before its last sample) and starts a new one.
+func _end_path(end_t: float) -> void:
+	if _pts.is_empty():
+		return
+	_ts.append(maxf(end_t, _ts[-1]))
+	add_path(_pts, _ts)
+	_pts = PackedVector2Array()
+	_ts = PackedFloat64Array()
 
 
 ## Reads every [code].jsonl[/code] file in [param dirs] and keeps what was played in [param level_id].

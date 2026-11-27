@@ -8,11 +8,17 @@ extends RefCounted
 ##
 ## How it works (density estimate with a Gaussian kernel):
 ## [codeblock]
-## D(c) = sum over points p of  G(c - p),   G(d) = exp(-|d|^2 / (2 sigma^2)) / Z
+## D(c) = sum over deposits (q, w) of  w * G(c - q),   G(d) = exp(-|d|^2 / (2 sigma^2)) / Z
 ## [/codeblock]
-## Z normalises the sampled kernel so it sums to 1, so the grid's total mass equals the point count.
-## Instead of adding a 2D kernel per point (points x taps^2), we:
-## 1. bin every point into its cell: one add per point, sessions split over worker threads,
+## Z normalises the sampled kernel so it sums to 1, so the grid's total mass equals the total weight.
+## Two kinds of input:
+## - [method build]: plain points (deaths), each a deposit of weight 1;
+## - [method build_level]: movement as time ([PlaytraceLevelData] explains the split). Each stay is one
+##   deposit of its seconds. Each path's travel time is spread evenly over points along the path, about
+##   [constant PATH_SPACING_SIGMA] sigma apart: Gaussians that close sum to a flat ridge (ripple ~3e-4),
+##   so paths look continuous with no beads.
+## Instead of adding a 2D kernel per deposit (deposits x taps^2), we:
+## 1. bin every deposit into its cell: sessions split over worker threads,
 ##    one partial grid per thread, summed after;
 ## 2. blur the counts with a separable Gaussian: a 1D kernel along rows, then along columns.
 ##    The 2D Gaussian is the product of two 1D ones, so this is exact and costs cells x taps.
@@ -26,6 +32,12 @@ extends RefCounted
 const MAX_CELLS := 1 << 20
 ## Cells per sigma. Two keeps the blur cheap while linear filtering keeps it smooth.
 const CELLS_PER_SIGMA := 2.0
+## Target distance between travel deposits along a path, in sigmas.
+const PATH_SPACING_SIGMA := 1.5
+## Most deposits per path segment (very long segments, like falls, may show faint beads above this).
+const MAX_DEPOSITS_PER_SEGMENT := 32
+## Colours are scaled to this percentile of the non-empty cells, so one hot spot cannot wash out the rest.
+const NORM_PERCENTILE := 0.99
 
 ## World position of the grid's top-left corner.
 var origin := Vector2.ZERO
@@ -39,36 +51,49 @@ var height := 0
 var values := PackedFloat32Array()
 ## Largest value in [member values].
 var max_value := 0.0
+## The [constant NORM_PERCENTILE] value of the non-empty cells; colours saturate above it.
+var norm_value := 0.0
 
 # Work shared with the parallel steps. Threads only read these; each writes its own _parts slot.
 var _sets: Array[PackedVector2Array] = []
+var _level: PlaytraceLevelData
+var _sigma_px := 1.0
 var _src := PackedFloat32Array()
 var _kernel := PackedFloat32Array()
 var _parts: Array[PackedFloat32Array] = []
+var _partials: Array[PackedFloat32Array] = []
 var _jobs := 1
 
 
-## Builds the density of [param point_sets] (one array per session) with kernel sigma [param sigma_px].
+## Builds the density of [param point_sets] (every point weighs 1) with kernel sigma [param sigma_px].
 ## [param bounds] is a world rect holding the points (points outside are ignored); empty = computed
 ## from the points. The grid covers it plus padding for the kernel.
 static func build(
 	point_sets: Array[PackedVector2Array], sigma_px: float, bounds: Rect2 = Rect2()
 ) -> PlaytraceDensityGrid:
-	var grid := PlaytraceDensityGrid.new()
-	sigma_px = maxf(sigma_px, 0.5)
 	if bounds == Rect2():
 		if _count(point_sets) == 0:
-			return grid
+			return PlaytraceDensityGrid.new()
 		bounds = points_bounds(point_sets)
-	var cell := _cell_size(bounds.grow(3.0 * sigma_px), sigma_px)
-	bounds = bounds.grow(3.0 * sigma_px + cell)
-	grid.cell_size = _cell_size(bounds, sigma_px)
-	grid.origin = bounds.position
-	grid.width = maxi(1, ceili(bounds.size.x / grid.cell_size))
-	grid.height = maxi(1, ceili(bounds.size.y / grid.cell_size))
-	grid._jobs = clampi(OS.get_processor_count(), 1, 16)
-	grid._bin(point_sets)
-	grid._blur(sigma_px / grid.cell_size)
+	var grid := _new_grid(bounds, sigma_px)
+	grid._sets = point_sets
+	grid._parallel(grid._bin_chunk, mini(grid._jobs, maxi(1, point_sets.size())), "Playtrace density binning")
+	grid._finish(sigma_px)
+	return grid
+
+
+## Builds the time density of [param data]'s movement: travel along paths plus stays. The total mass is
+## the recorded time in seconds. [code]data.bounds[/code] must hold every point (add_path keeps it so).
+static func build_level(data: PlaytraceLevelData, sigma_px: float) -> PlaytraceDensityGrid:
+	if data.paths.is_empty():
+		return PlaytraceDensityGrid.new()
+	var grid := _new_grid(data.bounds, sigma_px)
+	grid._level = data
+	grid._sets = data.paths
+	grid._sigma_px = maxf(sigma_px, 0.5)
+	grid._parallel(grid._bin_level_chunk, mini(grid._jobs, data.paths.size()), "Playtrace density binning")
+	grid._level = null
+	grid._finish(sigma_px)
 	return grid
 
 
@@ -113,12 +138,26 @@ func peak_position() -> Vector2:
 	return origin + (Vector2(best % maxi(width, 1), best / maxi(width, 1)) + Vector2(0.5, 0.5)) * cell_size
 
 
-## Sum of all cells (equals the number of points inside the bounds).
+## Sum of all cells (equals the total weight inside the bounds).
 func total() -> float:
 	var s := 0.0
 	for v: float in values:
 		s += v
 	return s
+
+
+# A grid covering bounds plus 3 sigma and one cell of padding, with cells of sigma / 2.
+static func _new_grid(bounds: Rect2, sigma_px: float) -> PlaytraceDensityGrid:
+	var grid := PlaytraceDensityGrid.new()
+	sigma_px = maxf(sigma_px, 0.5)
+	var cell := _cell_size(bounds.grow(3.0 * sigma_px), sigma_px)
+	bounds = bounds.grow(3.0 * sigma_px + cell)
+	grid.cell_size = _cell_size(bounds, sigma_px)
+	grid.origin = bounds.position
+	grid.width = maxi(1, ceili(bounds.size.x / grid.cell_size))
+	grid.height = maxi(1, ceili(bounds.size.y / grid.cell_size))
+	grid._jobs = clampi(OS.get_processor_count(), 1, 16)
+	return grid
 
 
 static func _cell_size(bounds: Rect2, sigma_px: float) -> float:
@@ -156,16 +195,29 @@ func _band_rows(band: int) -> Vector2i:
 	return Vector2i(mini(band * per, height), mini((band + 1) * per, height))
 
 
-func _bin(point_sets: Array[PackedVector2Array]) -> void:
-	_sets = point_sets
-	_parallel(_bin_chunk, mini(_jobs, maxi(1, point_sets.size())), "Playtrace density binning")
-	values = _parts[0]
-	for c in range(1, _parts.size()):
-		var part := _parts[c]
-		for i in values.size():
-			values[i] += part[i]
+# Sums the partial grids of the binning step (in parallel row bands), then blurs.
+func _finish(sigma_px: float) -> void:
+	if _parts.size() == 1:
+		values = _parts[0]
+	else:
+		_partials = _parts.duplicate()
+		_parallel(_sum_band, mini(_jobs, height), "Playtrace density merge")
+		values = _join_bands()
+		_partials.clear()
 	_parts.clear()
 	_sets = []
+	_blur(maxf(sigma_px, 0.5) / cell_size)
+
+
+func _sum_band(band: int) -> void:
+	var rows := _band_rows(band)
+	var from := rows.x * width
+	var out := _partials[0].slice(from, rows.y * width)
+	for c in range(1, _partials.size()):
+		var part := _partials[c]
+		for i in out.size():
+			out[i] += part[from + i]
+	_parts[band] = out
 
 
 # Adds 1.0 per point to its cell, for sessions chunk, chunk + n, ... into a private grid.
@@ -187,6 +239,61 @@ func _bin_chunk(chunk: int) -> void:
 	_parts[chunk] = local
 
 
+# Deposits travel and stays for paths chunk, chunk + n, ... into a private grid.
+# Subdividing a path in GDScript costs ~1.5 us per segment, too slow for millions of samples, so the
+# path is stretched in C++ instead: as a one-row RGF image of n points resized to n * k pixels with
+# bilinear filtering. Pixel d samples the polyline at (d + 0.5) / k - 0.5; with k even, dropping k / 2
+# clamped pixels at each end leaves exactly k points per segment, at the middles of k equal pieces.
+# All of them share the path's travel time.
+func _bin_level_chunk(chunk: int) -> void:
+	var local := PackedFloat32Array()
+	local.resize(width * height)
+	# Cell units shifted by half a cell, so int() gives the top-left of the 4 cells around a deposit.
+	var to_cells := Transform2D(0.0, Vector2.ONE / cell_size, 0.0, -origin / cell_size - Vector2(0.5, 0.5))
+	var spacing := PATH_SPACING_SIGMA * _sigma_px
+	var w := width
+	var n := _parts.size()
+	var s := chunk
+	while s < _sets.size():
+		var pts := to_cells * _sets[s]
+		var segments := pts.size() - 1
+		if segments > 0 and _level.path_travel_s[s] > 0.0:
+			var k := (
+				2 * clampi(ceili(_level.path_length_px[s] / segments / spacing / 2.0), 1, MAX_DEPOSITS_PER_SEGMENT / 2)
+			)
+			var img := Image.create_from_data(pts.size(), 1, false, Image.FORMAT_RGF, pts.to_byte_array())
+			img.resize(pts.size() * k, 1, Image.INTERPOLATE_BILINEAR)
+			var deposits := img.get_data().to_vector2_array().slice(k / 2, pts.size() * k - k / 2)
+			var wt := _level.path_travel_s[s] / deposits.size()
+			# Linear splat along the path's main axis: each deposit is shared by its 2 nearest cell centres
+			# by distance, so its position along the path survives. Nearest-cell binning would snap
+			# deposits that are a fixed distance apart into a repeating pattern, which shows as bright and
+			# dark beats along busy paths. Across the path, rounding only shifts it by under half a cell.
+			# (A full 2D bilinear splat costs twice as much and broke the T21 budget.)
+			if _level.path_horizontal[s]:
+				for c: Vector2 in deposits:
+					var ix := int(c.x)
+					var i := int(c.y + 0.5) * w + ix
+					var right := (c.x - ix) * wt
+					local[i] += wt - right
+					local[i + 1] += right
+			else:
+				for c: Vector2 in deposits:
+					var iy := int(c.y)
+					var i := iy * w + int(c.x + 0.5)
+					var down := (c.y - iy) * wt
+					local[i] += wt - down
+					local[i + w] += down
+		s += n
+	var stays := to_cells * _level.stay_points
+	var j := chunk
+	while j < stays.size():
+		var c := stays[j]
+		local[int(c.y + 0.5) * w + int(c.x + 0.5)] += _level.stay_seconds[j]
+		j += n
+	_parts[chunk] = local
+
+
 func _blur(sigma_cells: float) -> void:
 	var r := ceili(3.0 * sigma_cells)
 	_kernel.resize(2 * r + 1)
@@ -204,9 +311,13 @@ func _blur(sigma_cells: float) -> void:
 	_parallel(_blur_cols_band, bands, "Playtrace density blur")
 	values = _join_bands()
 	_src = PackedFloat32Array()
-	max_value = 0.0
+	var filled := PackedFloat32Array()
 	for v: float in values:
-		max_value = maxf(max_value, v)
+		if v > 0.0:
+			filled.append(v)
+	filled.sort()
+	max_value = filled[-1] if not filled.is_empty() else 0.0
+	norm_value = filled[int((filled.size() - 1) * NORM_PERCENTILE)] if not filled.is_empty() else 0.0
 
 
 # Horizontal pass for one band of rows: scatter each non-empty cell along its row.

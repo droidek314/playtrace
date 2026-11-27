@@ -40,3 +40,35 @@ func test_death_hotspot_of_fixture_cluster() -> void:
 	var sets: Array[PackedVector2Array] = [data.deaths]
 	var peak := PlaytraceDensityGrid.build(sets, 16.0).peak_position()
 	assert_float(peak.distance_to(Vector2(914.5, 388))).is_less(32.0)
+
+
+func test_paths_break_at_death_level_change_and_teleport() -> void:
+	var data := PlaytraceLevelData.new("a")
+	var events: Array = [
+		{"t": 0, "type": "level_enter", "level": "a"},
+		{"t": 0, "type": "pos", "p": [0.0, 0.0, 0]},
+		{"t": 200, "type": "pos", "p": [40.0, 0.0, 0]},
+		{"t": 600, "type": "death", "p": [50.0, 0.0, 0]},
+		{"t": 1600, "type": "pos", "p": [0.0, 0.0, 0]},
+		{"t": 1800, "type": "pos", "p": [900.0, 0.0, 0]},  # 4500 px/s: teleport
+		{"t": 2000, "type": "pos", "p": [940.0, 0.0, 0]},
+		{"t": 9000, "type": "stuck", "p": [940.0, 0.0, 0]},  # not part of the path, but its time counts
+		{"t": 12000, "type": "quit", "p": [940.0, 0.0, 0]},
+	]
+	data.add_session(events)
+	assert_int(data.paths.size()).is_equal(3)
+	assert_array(Array(data.paths[0])).contains_exactly([Vector2(0, 0), Vector2(40, 0)])
+	assert_array(Array(data.paths[1])).contains_exactly([Vector2(0, 0)])
+	assert_array(Array(data.paths[2])).contains_exactly([Vector2(900, 0), Vector2(940, 0)])
+	assert_array(_ms(data.path_travel_s)).contains_exactly([200, 0, 200])
+	# Stays: until the death, the time before the jump, the hesitation before the quit.
+	assert_array(Array(data.stay_points)).contains_exactly([Vector2(40, 0), Vector2(0, 0), Vector2(940, 0)])
+	assert_array(_ms(data.stay_seconds)).contains_exactly([400, 200, 10000])
+	assert_array(Array(data.deaths)).contains_exactly([Vector2(50, 0)])
+	data.add_session([{"t": 0, "type": "level_enter", "level": "a"}, {"t": 0, "type": "level_exit", "level": "a"}])
+	assert_int(data.session_count).is_equal(2)
+
+
+# Seconds to whole milliseconds, so float sums like 0.6 - 0.2 compare exactly.
+func _ms(seconds: PackedFloat64Array) -> Array:
+	return Array(seconds).map(func(x: float) -> int: return roundi(x * 1000.0))

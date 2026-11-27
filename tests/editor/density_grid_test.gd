@@ -59,3 +59,45 @@ func test_colorize_is_transparent_where_empty_and_never_opaque() -> void:
 		assert_float(img.get_pixel(0, 0).a).is_equal(0.0)
 		var peak := grid.cell_of(grid.peak_position())
 		assert_float(img.get_pixel(peak.x, peak.y).a).is_between(0.9, 0.96)
+
+
+# T16 for movement. The exact rule (PlaytraceLevelData): for samples a -> b with dt seconds,
+# min(dt, 0.2 s) is travel spread along a -> b and the rest is a stay at a; the last sample stays until
+# the path ended. So a path adds exactly its duration, times[-1] - times[0], and the grid total is the
+# total recorded time in seconds.
+func test_path_mass_equals_recorded_time() -> void:
+	var data := PlaytraceLevelData.new("l")
+	# 5 s standing at (40, 0), 3.4 s before the path ended: duration 9 s.
+	data.add_path(
+		PackedVector2Array([Vector2(0, 0), Vector2(40, 0), Vector2(80, 10), Vector2(80, 10)]),
+		PackedFloat64Array([0.0, 0.2, 5.4, 5.6, 9.0])
+	)
+	data.add_path(PackedVector2Array([Vector2(300, 300), Vector2(330, 260)]), PackedFloat64Array([12.0, 12.2, 12.2]))
+	var grid := PlaytraceDensityGrid.build_level(data, 8.0)
+	assert_float(grid.total()).is_equal_approx(9.2, 9.2 * 0.001)
+
+
+func test_standing_still_counts_at_the_earlier_sample() -> void:
+	var data := PlaytraceLevelData.new("l")
+	data.add_path(PackedVector2Array([Vector2(0, 0), Vector2(200, 0)]), PackedFloat64Array([0.0, 6.0, 6.0]))
+	var grid := PlaytraceDensityGrid.build_level(data, 8.0)
+	assert_object(grid.cell_of(grid.peak_position())).is_equal(grid.cell_of(Vector2(0, 0)))
+	# The 0.2 s of travel is spread evenly: the middle of the segment is warm but far below the stop.
+	var mid := grid.value_at(Vector2(100, 0))
+	assert_float(mid).is_greater(0.0)
+	assert_float(mid).is_less(grid.value_at(Vector2(0, 0)) * 0.05)
+	assert_float(grid.value_at(Vector2(60, 0))).is_equal_approx(mid, mid * 0.05)  # no beads along the path
+	assert_float(grid.value_at(Vector2(70, 0))).is_equal_approx(mid, mid * 0.05)
+
+
+func test_colours_normalise_to_the_99th_percentile() -> void:
+	var pts := PackedVector2Array()
+	for i in 400:
+		pts.append(Vector2(i * 8.0, 0))
+	for i in 50:
+		pts.append(Vector2(1000, 400))  # one very hot spot
+	var grid := PlaytraceDensityGrid.build(_sets(Array(pts)), 8.0)
+	assert_float(grid.norm_value).is_less(grid.max_value * 0.5)
+	var img := PlaytraceHeatmapPalette.colorize(grid, PlaytraceHeatmapPalette.MAGMA)
+	var line := grid.cell_of(Vector2(1600, 0))
+	assert_float(img.get_pixel(line.x, line.y).a).is_greater(0.5)  # the ordinary path stays visible
