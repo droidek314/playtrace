@@ -54,6 +54,20 @@ static func defaults() -> Dictionary:
 	}
 
 
-## Registers missing keys with their defaults in ProjectSettings. Implemented in M2 (WS-B).
+## Registers every key that is missing from ProjectSettings with its default, so it shows in the editor.
+## Existing values are kept. Does not save project.godot; the editor saves it.
 static func register_defaults() -> void:
-	pass
+	var d := defaults()
+	for key: String in d:
+		if not ProjectSettings.has_setting(key):
+			ProjectSettings.set_setting(key, d[key])
+		ProjectSettings.set_initial_value(key, d[key])
+		ProjectSettings.set_as_basic(key, true)
+	ProjectSettings.add_property_info(
+		{"name": SETUP_MODE, "type": TYPE_STRING, "hint": PROPERTY_HINT_ENUM, "hint_string": "auto,manual"}
+	)
+
+
+## Returns the current value of [param key], or its default if it is not set.
+static func get_value(key: String) -> Variant:
+	return ProjectSettings.get_setting(key, defaults().get(key))
