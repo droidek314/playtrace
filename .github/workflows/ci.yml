@@ -52,7 +52,7 @@ jobs:
         with:
           global-json-file: server/global.json
       - name: Migrations match the model
-        run: dotnet tool restore && dotnet ef migrations has-pending-model-changes --project src/Playtrace.Server
+        run: dotnet tool restore && dotnet restore && dotnet ef migrations has-pending-model-changes --project src/Playtrace.Server
         env:
           ConnectionStrings__Playtrace: Host=localhost
       # T29-T33 use Testcontainers (Docker is available on ubuntu runners).
