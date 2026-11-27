@@ -29,7 +29,9 @@ Three folders with a strict rule: `runtime/` and `shared/` must never reference 
 | File | Purpose |
 | --- | --- |
 | `plugin.cfg`, `plugin.gd` | Editor entry point. Enabling the plugin registers the `Playtrace` autoload; disabling it removes the autoload. |
-| `runtime/playtrace.gd` | The `Playtrace` autoload that records sessions in the game. It has no `class_name` (D-006). Still a stub; implemented in M1. |
+| `runtime/playtrace.gd` | The `Playtrace` autoload. It has no `class_name` (D-006). It runs one `_step()` per frame: it checks for a pending death, follows scene changes (auto levels), finds the player (throttled to every 0.5 s while missing), samples positions on a fixed 0.2 s schedule, feeds the stuck detector, and flushes every 5 s. The public methods are the manual API. The internal `_configure()` takes hooks for tests. |
+| `runtime/session_writer.gd` | `PlaytraceSessionWriter`: buffers JSON lines and writes + flushes them on `flush()`. |
+| `runtime/stuck_detector.gd` | `PlaytraceStuckDetector`: anchor point + radius; reports one stuck period with its total unpaused time. |
 | `shared/schema.gd` | `PlaytraceSchema`: schema version, event type names and the default sessions directory. Use these constants instead of string literals. |
 | `shared/settings.gd` | `PlaytraceSettings`: every project settings key, `defaults()`, `register_defaults()` (adds missing keys to Project Settings) and `get_value(key)`. |
 | `shared/session.gd` | `PlaytraceSession`: one session in memory (`header`, `events`, `warnings`) plus helpers: `events_of_type()`, `levels()`, `duration_ms()`, `outcome()`. |
@@ -65,6 +67,6 @@ It walks the events backwards and returns `"completed"` or `"quit"` for whicheve
 ## How to add a new event type
 
 1. Add a constant to `shared/schema.gd`.
-2. Add it to `KNOWN_TYPES` in `shared/session_reader.gd`.
+2. Add it to `KNOWN_TYPES` in `shared/session_reader.gd`. The T02 round-trip test fails until the recorder can write it.
 3. Document it in sections 5 and 6 of the spec and in `docs/CONTRACTS.md`. A new type is a compatible change, so the schema number stays the same.
 4. Write it from the runtime and add a round-trip test (T02).

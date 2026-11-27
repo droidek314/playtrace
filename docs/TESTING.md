@@ -80,6 +80,18 @@ Section 12 of [PLAYTRACE_SPEC.md](../PLAYTRACE_SPEC.md) defines the test IDs (T0
 | ID | What it checks | Test file |
 | --- | --- | --- |
 | T01 | Pipeline smoke: lint, GdUnit4, xUnit | all suites; `tests/*/contract_test.gd`, `server/tests/.../HealthTests.cs` |
+| T02 | Every event type round-trips through writer and reader | `tests/runtime/recorder_test.gd` |
+| T03 | 10 s of movement → ~50 `pos`; none when moving < 2 px | `tests/runtime/recorder_test.gd` |
+| T04 | Stuck: 8 s still → 1 event; jitter counts; paused time doesn't | `tests/runtime/recorder_test.gd` |
+| T05 | Quit on close; a crash loses at most 5 s | `tests/runtime/recorder_test.gd` |
+| T06 | Recorder overhead < 0.1 ms/frame over 10,000 frames (prints the measured value) | `tests/runtime/recorder_test.gd` |
+| T07 | Recording off → no files, API calls do nothing | `tests/runtime/recorder_test.gd` |
+| T08 | Zero-code: freeing a `CharacterBody2D` player records a death | `tests/runtime/recorder_test.gd` |
+| T09 | Group `player` wins; no player → warning, no crash | `tests/runtime/recorder_test.gd` |
+| T10 | Same-scene reload within 1 s → one death; other scene or later → none | `tests/runtime/recorder_test.gd` |
+| T11 | Manual mode records only explicit calls | `tests/runtime/recorder_test.gd` |
+| T12 | Takeover: mixing auto and `death()` never double counts | `tests/runtime/recorder_test.gd` |
+| T13 | Same scripted run in auto and manual mode → same death/stuck/quit positions ± 4 px | `tests/runtime/recorder_test.gd` |
 | T14 | Generator determinism | `tests/shared/generator_test.gd` |
 | T15 | Reader robustness | `tests/shared/session_reader_test.gd` |
 | T16 | Density grid: peak in the right cell, total mass = event count | `tests/editor/density_grid_test.gd` |
@@ -90,3 +102,7 @@ Section 12 of [PLAYTRACE_SPEC.md](../PLAYTRACE_SPEC.md) defines the test IDs (T0
 | T21 | 1,000 × 10 min computed off the main thread in < 1 s | `tests/editor/heatmap_perf_test.gd` |
 
 `tests/shared/generator_test.gd` also checks that every planted feature is present in 200 generated sessions, and `tests/shared/sandbox_test.gd` checks that the sandbox loads and its player stands on the ground. Other IDs are added to this table as their milestones land.
+
+### How the recorder tests work
+
+`tests/runtime/recorder_test.gd` never uses the global autoload (it doesn't record under a test runner; D-030). Each test makes its own recorder instance and calls its internal `_configure()` with hooks for the clock, the current scene and the paused state. It then calls `_step()` once per simulated 16 ms frame. Ten "seconds" of play run in milliseconds, and scene reloads are simulated by freeing the level node and swapping in a new one with the same `scene_file_path`.
