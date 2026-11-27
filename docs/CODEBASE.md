@@ -1,6 +1,6 @@
 # Codebase tour
 
-A file-by-file guide for contributors. For how the parts fit together, see [ARCHITECTURE.md](ARCHITECTURE.md). For the frozen interfaces, see [CONTRACTS.md](CONTRACTS.md).
+A file-by-file guide for contributors. For how the parts fit together, see `ARCHITECTURE.md` (written with M3). For the frozen interfaces, see [CONTRACTS.md](CONTRACTS.md).
 
 ## Where to start reading
 
@@ -19,7 +19,7 @@ A file-by-file guide for contributors. For how the parts fit together, see [ARCH
 | `demo/` | The sandbox level used by tests and the demo. |
 | `tools/` | The session generator and its ground truth. Not shipped to users. |
 | `tests/` | GdUnit4 suites and frozen fixtures. See [TESTING.md](TESTING.md). |
-| `server/` | Self-hostable ASP.NET Core server. See [SERVER.md](SERVER.md). |
+| `server/` | Self-hostable ASP.NET Core server. See `SERVER.md` (written with M6). |
 | `docs/` | All documentation. |
 
 ## `addons/playtrace/`
