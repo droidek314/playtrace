@@ -44,7 +44,7 @@ func _exit_tree() -> void:
 
 
 func _forward_canvas_force_draw_over_viewport(viewport_control: Control) -> void:
-	viewport_control.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	viewport_control.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_overlay.draw(viewport_control, EditorInterface.get_editor_viewport_2d().global_canvas_transform)
 
 

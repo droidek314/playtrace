@@ -34,7 +34,7 @@ var palette := PlaytraceHeatmapPalette.MAGMA:
 		palette = v
 		_request(false)
 ## Gaussian kernel sigma in world pixels.
-var kernel_radius_px := 32.0:
+var kernel_radius_px := 16.0:
 	set(v):
 		kernel_radius_px = maxf(v, 1.0)
 		_request(false)
@@ -129,8 +129,11 @@ static func death_segments(xform: Transform2D, points: PackedVector2Array, half_
 ## Builds everything the overlay shows from [param data]. Pure and thread-safe; returns
 ## [code]{image: Image, rect: Rect2}[/code] (image is null when there are no positions).
 static func compute(data: PlaytraceLevelData, sigma_px: float, palette_id: int) -> Dictionary:
-	var grid := PlaytraceDensityGrid.build(data.paths, sigma_px, data.bounds)
-	return {"image": PlaytraceHeatmapPalette.colorize(grid, palette_id), "rect": grid.world_rect()}
+	var grid := PlaytraceDensityGrid.build_level(data, sigma_px)
+	var image := PlaytraceHeatmapPalette.colorize(grid, palette_id)
+	if image != null:
+		image.generate_mipmaps()  # zoomed out, the texture is drawn smaller than its cells; avoids shimmer
+	return {"image": image, "rect": grid.world_rect()}
 
 
 func _request(reload_data: bool) -> void:

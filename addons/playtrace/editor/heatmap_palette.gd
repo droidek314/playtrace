@@ -13,7 +13,8 @@ const MAGMA := 0
 const VIRIDIS := 1
 ## Display names, indexed by palette id.
 const NAMES: Array[String] = ["Magma", "Viridis"]
-## Density is shown as (value / max) ^ GAMMA, so thin paths stay visible next to hot spots.
+## Density is shown as (value / norm) ^ GAMMA, clamped at 1, where norm is the grid's 99th percentile
+## ([member PlaytraceDensityGrid.norm_value]). The curve keeps thin paths visible next to hot spots.
 const GAMMA := 0.5
 
 const _LUT_SIZE := 1024
@@ -51,7 +52,7 @@ static func gradient(id: int) -> Gradient:
 ## Colours [param grid] with palette [param id] into an RGBA8 image, one pixel per cell.
 ## Safe to call from a worker thread. Returns null for an empty grid.
 static func colorize(grid: PlaytraceDensityGrid, id: int) -> Image:
-	if grid.width == 0 or grid.height == 0 or grid.max_value <= 0.0:
+	if grid.width == 0 or grid.height == 0 or grid.norm_value <= 0.0:
 		return null
 	var g := gradient(id)
 	var lut := PackedByteArray()
@@ -66,13 +67,14 @@ static func colorize(grid: PlaytraceDensityGrid, id: int) -> Image:
 	var base := Image.create_empty(grid.width, grid.height, false, Image.FORMAT_RGBA8)
 	base.fill(g.sample(0.0))
 	var data := base.get_data()
-	var scale := float(_LUT_SIZE - 1) / grid.max_value
+	var scale := float(_LUT_SIZE - 1) / grid.norm_value
+	var top := (_LUT_SIZE - 1) * 4
 	var values := grid.values
 	for i in values.size():
 		var v := values[i]
 		if v <= 0.0:
 			continue
-		var o := int(v * scale) * 4
+		var o := mini(int(v * scale) * 4, top)
 		var d := i * 4
 		data[d] = lut[o]
 		data[d + 1] = lut[o + 1]
