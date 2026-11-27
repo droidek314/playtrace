@@ -113,16 +113,63 @@ Code: [`heatmap_palette.gd`](../addons/playtrace/editor/heatmap_palette.gd).
 
 ## 4. Drawing over the level
 
-The 2D editor shows your scene through a canvas transform: it scales by the zoom and moves by the pan. The editor draws its own gizmos with that same transform on an overlay control above the scene. Playtrace hooks into that overlay (`EditorPlugin._forward_canvas_force_draw_over_viewport`) and on every redraw:
+The 2D editor shows your scene through a canvas transform: it scales by the zoom and moves by the pan. The editor draws its own gizmos with that same transform on an overlay control above the scene. Playtrace hooks into that overlay (`EditorPlugin._forward_canvas_force_draw_over_viewport`, D-027) and on every redraw:
 
 1. reads the current transform from `EditorInterface.get_editor_viewport_2d().global_canvas_transform`;
 2. draws the heatmap texture over the world rectangle the grid covers, using that transform, so it scales and moves with the level;
-3. maps every death position through the transform and draws an X mark there at a fixed screen size (10 px), so marks stay readable at any zoom. Each X is drawn three times: two wide, translucent dark strokes as a soft outline, then the red stroke on top. The outline keeps the marks visible on light and dark tiles.
+3. maps every marker position through the transform and draws it at a fixed screen size, so markers stay readable at any zoom.
+
+The layers go into two canvas items of Playtrace's own, placed under the editor's overlay control: first the heatmap (with linear filtering and mipmaps), then the markers. That way the texture filter never changes how the editor draws its own icons.
 
 Because nothing is cached in screen space, the layers stay exactly on the level while you pan and zoom (test T20).
 
+### Markers
+
+| Layer | Drawn as |
+| --- | --- |
+| Deaths | A red X with a soft dark outline (two wide translucent dark strokes under the red one), so it reads on light and dark tiles. |
+| Stuck zones | A soft yellow ring that pulses gently. Its radius grows with the total seconds players were stuck there (1.5 px per second, 10 to 60 px). The plugin redraws every frame only while rings are on screen in the 2D view. |
+| Quit points | A small muted red door with a dark outline. |
+
 Code: [`heatmap_overlay.gd`](../addons/playtrace/editor/heatmap_overlay.gd), [`overlay_transform.gd`](../addons/playtrace/editor/overlay_transform.gd).
 
-## 5. Controls (M3)
+### Clustering into numbered badges
 
-Until the dock arrives (M4), the controls sit in the 2D editor toolbar: show/hide, opacity, kernel radius, palette, reload. Press reload after a new playtest to read the new session files. Opacity only redraws; radius and palette rebuild the image in the background; reload also re-reads the files.
+When you zoom out, many markers land on the same few pixels. Playtrace groups them into one badge with the number of markers inside:
+
+1. Markers are put into square cells 18 screen pixels wide. In world pixels that is `18 / zoom`, so cells grow as you zoom out and shrink as you zoom in.
+2. Neighbouring cells whose marker centres are closer than one cell are joined, so a group sitting on a cell border is not split in two.
+3. Each group becomes one marker at the average position of its members. A group of one is drawn as a normal marker; bigger groups get a badge.
+
+Every marker ends up in exactly one group, so the badge numbers always add up to the number of markers (test T24). The work is linear in the number of markers and is cached per zoom level.
+
+![Badges split up when you zoom in](images/m4_badges_zoomed_in.png)
+
+Code: [`marker_clusters.gd`](../addons/playtrace/editor/marker_clusters.gd).
+
+## 5. Insights: how hotspots are ranked
+
+The **Insights** tab lists, for the open level and the sessions that pass the filters:
+
+- **Top 3 death hotspots.** Deaths are grouped like the badges, with a fixed 48 px world distance, and ranked by the number of deaths. For each hotspot Playtrace counts deaths per session: the share of players who died there at all, and the share who died there 3 or more times. The second is shown ("30 % of players died here 3+ times") when at least 10 % of players did; otherwise the first.
+- **Largest stuck zone.** Stuck events grouped the same way, ranked by total stuck seconds.
+- **Most common quit point.** Quit events grouped the same way, ranked by count, shown as a share of all quits.
+- **Never-visited floors.** Playtrace reads the level's solid shapes (`StaticBody2D` rectangles and `TileMapLayer` cells) and takes their top edges as floors a player could stand on. Along each floor it samples the movement heatmap 16 px above it (where a standing player's centre is). Stretches of at least 64 px where the density stays under 1 % of the colour scale are listed, longest first. Other shapes (polygons, circles, rotated bodies) are not checked.
+
+Clicking an insight centres the 2D view on it. The popover on a marker shows its count, the share of players, and the **average time spent** nearby: the heatmap's mass (seconds) within 48 px, divided by the number of players.
+
+Test T23 checks that, for a fixed generator seed, the top hotspot, the stuck zone, the quit point and the hidden room's floor match `tools/planted.json`.
+
+Code: [`insights.gd`](../addons/playtrace/editor/insights.gd), [`level_surfaces.gd`](../addons/playtrace/editor/level_surfaces.gd).
+
+## 6. Setup health
+
+The **Setup** tab checks the recording setup from the sessions themselves (spec 2.3, D-029):
+
+- `player_not_found`: a session header says no player was found (`detection.player` is empty).
+- `player_never_moved`: a player was found, but every `pos` of a session is within 2 px of its first one, so the wrong node is probably tracked.
+- `reloads_without_deaths`: some level was re-entered 3 or more times in total across sessions (a `level_enter` for a level the session had already entered) and has no deaths. The game probably "kills" the player without removing the node.
+
+Each warning is listed once. The card shows the detection of the latest session (mode, player, deaths, levels) in green when the sessions confirm it and yellow when it is only guessed or looks wrong, with a **Fix** button that shows the exact line of code and where to put it.
+
+Code: [`setup_health.gd`](../addons/playtrace/editor/setup_health.gd).
