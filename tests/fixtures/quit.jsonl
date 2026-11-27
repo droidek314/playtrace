@@ -1,0 +1,7 @@
+{"schema":1,"type":"session_start","game":"playtrace-fixtures","build":"0.1.0","godot":"4.7.2","platform":"Windows","session":"0b6f2c1e-4a8d-4c1b-9f3e-2a7d5c8e1f02","started_utc":"2026-11-20T11:00:00Z","detection":{"mode":"auto","player":"Player (CharacterBody2D)","deaths":"node_removal","levels":"scene"}}
+{"t":0,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":200,"type":"pos","p":[64.0,400.0,0]}
+{"t":400,"type":"pos","p":[90.0,400.0,0]}
+{"t":3000,"type":"pos","p":[400.0,390.0,0]}
+{"t":3200,"type":"custom","name":"opened_door","data":{"door":"red"}}
+{"t":7800,"type":"quit","p":[402.0,390.0,0]}

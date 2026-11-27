@@ -1,0 +1,10 @@
+{"schema":1,"type":"session_start","game":"playtrace-fixtures","build":"0.1.0","godot":"4.7.2","platform":"Windows","session":"0b6f2c1e-4a8d-4c1b-9f3e-2a7d5c8e1f01","started_utc":"2026-11-20T10:00:00Z","detection":{"mode":"auto","player":"Player (CharacterBody2D)","deaths":"node_removal","levels":"scene"}}
+{"t":0,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":200,"type":"pos","p":[64.0,400.0,0]}
+{"t":400,"type":"pos","p":[96.0,400.0,0]}
+{"t":600,"type":"pos","p":[128.0,396.5,0]}
+{"t":5200,"type":"checkpoint","p":[512.0,380.0,0],"data":{"name":"mid"}}
+{"t":5400,"type":"pos","p":[540.0,380.0,0]}
+{"t":12000,"type":"pos","p":[1200.0,360.0,0]}
+{"t":12400,"type":"level_complete","p":[1250.0,360.0,0]}
+{"t":12400,"type":"level_exit","level":"res://demo/sandbox.tscn"}

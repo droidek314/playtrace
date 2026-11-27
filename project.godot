@@ -1,0 +1,13 @@
+; Engine configuration file.
+; Playtrace development project: the repo root is the Godot project (D-005).
+
+config_version=5
+
+[application]
+
+config/name="Playtrace"
+config/features=PackedStringArray("4.7")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")

@@ -1,0 +1,7 @@
+{"schema":1,"type":"session_start","game":"playtrace-fixtures","build":"0.1.0","godot":"4.7.2","platform":"Windows","session":"0b6f2c1e-4a8d-4c1b-9f3e-2a7d5c8e1f05","started_utc":"2026-11-20T14:00:00Z","detection":{"mode":"manual","player":"Hero (CharacterBody2D)","deaths":"manual","levels":"manual"}}
+{"t":0,"type":"level_enter","level":"level_1"}
+{"t":200,"type":"pos","p":[64.0,400.0,0]}
+{"t":2600,"type":"pos","p":[700.0,250.0,0]}
+{"t":2800,"type":"feedback","p":[700.0,250.0,0],"data":{"text":"Is this ledge reachable?","screenshot":"1.jpg"}}
+{"t":4000,"type":"death","p":[720.0,500.0,0],"data":{"cause":"manual"}}
+{"t":9000,"type":"quit","p":[64.0,400.0,0]}

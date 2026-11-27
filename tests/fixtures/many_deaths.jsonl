@@ -1,0 +1,20 @@
+{"schema":1,"type":"session_start","game":"playtrace-fixtures","build":"0.1.0","godot":"4.7.2","platform":"Windows","session":"0b6f2c1e-4a8d-4c1b-9f3e-2a7d5c8e1f03","started_utc":"2026-11-20T12:00:00Z","detection":{"mode":"auto","player":"Player (CharacterBody2D)","deaths":"node_removal","levels":"scene"}}
+{"t":0,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":1500,"type":"pos","p":[602.0,388.0,0]}
+{"t":1800,"type":"death","p":[911.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":3300,"type":"pos","p":[604.0,388.0,0]}
+{"t":3600,"type":"death","p":[912.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":5100,"type":"pos","p":[606.0,388.0,0]}
+{"t":5400,"type":"death","p":[913.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":6900,"type":"pos","p":[608.0,388.0,0]}
+{"t":7200,"type":"death","p":[914.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":8700,"type":"pos","p":[610.0,388.0,0]}
+{"t":9000,"type":"death","p":[915.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":10500,"type":"pos","p":[612.0,388.0,0]}
+{"t":10800,"type":"death","p":[916.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":12300,"type":"pos","p":[614.0,388.0,0]}
+{"t":12600,"type":"death","p":[917.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":14100,"type":"pos","p":[616.0,388.0,0]}
+{"t":14400,"type":"death","p":[918.0,388.0,0],"data":{"cause":"spikes"}}
+{"t":16400,"type":"death","p":[300.0,420.0,0],"data":{"cause":"auto"}}
+{"t":18400,"type":"quit","p":[310.0,420.0,0]}

@@ -1,0 +1,10 @@
+{"schema":1,"type":"session_start","game":"playtrace-fixtures","build":"0.1.0","godot":"4.7.2","platform":"Windows","session":"0b6f2c1e-4a8d-4c1b-9f3e-2a7d5c8e1f06","started_utc":"2026-11-20T15:00:00Z","detection":{"mode":"auto","player":"Player (CharacterBody2D)","deaths":"node_removal","levels":"scene"}}
+{"t":0,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":200,"type":"pos","p":[64.0,400.0,0]}
+{"t":400,"type":"pos","p":[96.0,4
+this line is not json at all
+{"t":800,"type":"teleport","p":[1.0,2.0,0],"future_field":true}
+{"t":1000,"type":"pos","p":[128.0,400.0,0],"extra":{"unknown":1}}
+[1,2,3]
+{"t":1400,"type":"death","p":[130.0,400.0,0],"data":{"cause":"auto"}}
+{"t":1600,"type":"quit","p":[1
