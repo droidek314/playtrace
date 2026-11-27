@@ -556,3 +556,4 @@ These override anything above that disagrees. The same entries are in `docs/DECI
 | D-010 | The doc-snippet CI check (15.3) is added when USER_GUIDE / MANUAL_INTEGRATION exist; the link checker runs from M0. |
 | D-011 | No Docker locally: Docker-dependent work (image build, Testcontainers) runs in GitHub Actions. |
 | D-012 | The GitHub repo `droidek314/playtrace` is public, permanently. |
+| D-013 | `GET /v1/sessions` items use `levels: string[]`; `limit` default 100, max 500; `next` is null when there are no more items. See `docs/openapi.yaml`. |

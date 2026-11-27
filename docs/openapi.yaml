@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Playtrace Server API
+  version: 1.0.0
+  description: >
+    Self-hostable server that collects Playtrace sessions from game builds and serves them
+    to the Godot editor. Contract: PLAYTRACE_SPEC.md section 6.4 / docs/CONTRACTS.md.
+    Keys are per project; ingest keys can only write, read keys can only read.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8080
+paths:
+  /health:
+    get:
+      summary: Liveness check
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Server is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+  /v1/sessions:
+    post:
+      summary: Upload one finished session
+      description: >
+        Body is one session file (JSON Lines, schema v1) compressed with gzip, max 2 MB compressed.
+        Idempotent by the session id in the header line. CORS allows this endpoint from any origin.
+        Rate limit: 60 uploads/min per ingest key (configurable).
+      operationId: uploadSession
+      security:
+        - ingestKey: []
+      parameters:
+        - name: Content-Encoding
+          in: header
+          required: true
+          schema:
+            type: string
+            const: gzip
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Session stored.
+        "200":
+          description: Session with this id already stored; nothing changed.
+        "400":
+          description: Invalid gzip, JSON or schema.
+        "401":
+          description: Missing or wrong ingest key (read keys are rejected too).
+        "413":
+          description: Body larger than 2 MB.
+        "429":
+          description: Rate limit exceeded.
+    get:
+      summary: List sessions
+      operationId: listSessions
+      security:
+        - readKey: []
+      parameters:
+        - name: since
+          in: query
+          description: Opaque cursor from a previous response's `next`. Omit to start from the beginning.
+          schema:
+            type: string
+        - name: level
+          in: query
+          description: Only sessions that entered this level id.
+          schema:
+            type: string
+        - name: build
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: One page of sessions, oldest upload first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionSummary"
+                  next:
+                    type: [string, "null"]
+                    description: Cursor for the next page; null when there are no more items right now.
+        "401":
+          description: Missing or wrong read key (ingest keys are rejected too).
+  /v1/sessions/{id}:
+    get:
+      summary: Download one session as gzipped JSON Lines
+      operationId: getSession
+      security:
+        - readKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The session file, gzip-compressed.
+          headers:
+            Content-Encoding:
+              schema:
+                type: string
+                const: gzip
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Missing or wrong read key.
+        "404":
+          description: No session with this id in this project.
+components:
+  securitySchemes:
+    ingestKey:
+      type: http
+      scheme: bearer
+      description: Project ingest key (write only).
+    readKey:
+      type: http
+      scheme: bearer
+      description: Project read key (read only).
+  schemas:
+    SessionSummary:
+      type: object
+      required: [id, levels, build, started_utc, duration_ms, outcome, deaths]
+      properties:
+        id:
+          type: string
+          format: uuid
+        levels:
+          type: array
+          items:
+            type: string
+          description: Level ids in order of first entry.
+        build:
+          type: string
+        started_utc:
+          type: string
+          format: date-time
+        duration_ms:
+          type: integer
+          minimum: 0
+        outcome:
+          type: string
+          enum: [completed, quit, unknown]
+        deaths:
+          type: integer
+          minimum: 0
