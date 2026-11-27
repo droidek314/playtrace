@@ -1,0 +1,18 @@
+# Godot
+.godot/
+*.translation
+export_presets.cfg
+.playtrace/
+# GdUnit4 reports
+reports/
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+# OS / editors
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/
+.idea/
