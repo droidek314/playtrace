@@ -39,8 +39,8 @@ The editor depends on `shared/`, never on `runtime/` code. The editor's pure-mat
 | Component | File | Responsibility |
 | --- | --- | --- |
 | Plugin entry | [`plugin.gd`](../addons/playtrace/plugin.gd) | Registers the `Playtrace` autoload on enable. While loaded: creates the overlay and toolbar, follows `scene_changed`, and calls the overlay on every viewport redraw. |
-| Level data | [`level_data.gd`](../addons/playtrace/editor/level_data.gd) | Reads session files (via `PlaytraceSessionReader`) and keeps the movement samples and deaths played in one level. |
-| Density grid | [`density_grid.gd`](../addons/playtrace/editor/density_grid.gd) | Gaussian density of the movement samples: parallel binning plus separable blur. See [HOW_IT_WORKS.md](HOW_IT_WORKS.md#2-the-movement-heatmap-density-grid). |
+| Level data | [`level_data.gd`](../addons/playtrace/editor/level_data.gd) | Reads session files (via `PlaytraceSessionReader`) and keeps what was played in one level: movement as paths (broken at deaths, level changes and teleports) split into travel and stay time, plus deaths. |
+| Density grid | [`density_grid.gd`](../addons/playtrace/editor/density_grid.gd) | Time-weighted Gaussian density: deposits along paths (stretched in C++), parallel splatting, separable blur, 99th-percentile normalisation. See [HOW_IT_WORKS.md](HOW_IT_WORKS.md#2-the-movement-heatmap-density-grid). |
 | Palette | [`heatmap_palette.gd`](../addons/playtrace/editor/heatmap_palette.gd) | Magma and viridis ramps; turns a grid into an RGBA `Image`. |
 | Overlay transform | [`overlay_transform.gd`](../addons/playtrace/editor/overlay_transform.gd) | World → overlay pixel mapping with the editor's canvas transform. |
 | Heatmap overlay | [`heatmap_overlay.gd`](../addons/playtrace/editor/heatmap_overlay.gd) | Layer settings (opacity, palette, radius), background task scheduling, the finished texture, and the drawing code. |
@@ -54,7 +54,7 @@ sequenceDiagram
   participant Pool as WorkerThreadPool
   Main->>Pool: add_task(job) on scene change / reload / radius / palette
   Pool->>Pool: read files, filter level (only on reload)
-  Pool->>Pool: bin samples (group task, one partial grid per thread)
+  Pool->>Pool: deposit path time into cells (group task, one partial grid per thread)
   Pool->>Pool: blur rows, then columns (group tasks, bands of rows)
   Pool->>Pool: colour into Image
   Pool-->>Main: call_deferred(_finish, result)
