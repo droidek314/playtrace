@@ -170,7 +170,7 @@ Each session = one JSON Lines file. Line 1 is the header (`session_start`), then
 
 | type | Written when | Fields |
 | --- | --- | --- |
-| `session_start` | recorder start (header) | `schema`, `session` (UUID v4), `game`, `build`, `godot`, `platform`, `started_utc`, `detection` |
+| `session_start` | recorder start (header) | `schema`, `session` (UUID v4), `game`, `build`, `godot`, `platform`, `started_utc`, `detection` (`mode`, `player`, `deaths`, `levels`, `warnings`; D-029) |
 | `level_enter` / `level_exit` | level changes (auto or `level()`) | `level` |
 | `pos` | every 0.2 s if moved > 2 px (configurable) | `p` |
 | `death` | auto-detected or `death()` | `p`, `data.cause` (`"auto"` if detected) |
@@ -566,3 +566,4 @@ These override anything above that disagrees. The same entries are in `docs/DECI
 | D-020 | Server: keys are `pt_ingest_` / `pt_read_` + 32 random bytes (Base64url), stored as SHA-256 only; session ids unique per project; non-object event lines skipped, only a bad header gives 400; decompressed size capped at 16 MB (413); events stored as one `jsonb` array per session, so downloads have the same content but may differ in key order/spacing; migrations run on start. Details in `docs/SERVER.md`. |
 | D-027 | The overlay uses `set_force_draw_over_forwarding_enabled()` + `_forward_canvas_force_draw_over_viewport()`. The plain `_forward_canvas_draw_over_viewport()` only runs while the plugin handles the selected node, so the overlay would vanish when a normal node is selected. |
 | D-028 | `docs/` has a `.gdignore` so Godot doesn't import the doc images (the repo root is a Godot project). |
+| D-029 | Setup health (2.3): the header's `detection` gains `"warnings": Array[String]` (same shape as `get_detection_report()`), and `detection.player` is `""` when no player was found. Warning codes are constants in `PlaytraceSchema`: `player_not_found`, `player_never_moved`, `reloads_without_deaths`. The recorder puts start-time warnings (`player_not_found`) in the header; the editor derives all three from the sessions themselves (never moved = all `pos` within 2 px of the first, only when a player was found; reloads = level re-entries summed across sessions ≥ 3 with 0 deaths). Fixtures for T26 are in `tests/fixtures/setup_health/`. |

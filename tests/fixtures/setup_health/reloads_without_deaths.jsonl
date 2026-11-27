@@ -1,0 +1,16 @@
+{"schema":1,"type":"session_start","game":"playtrace-fixtures","build":"0.1.0","godot":"4.7.2","platform":"Windows","started_utc":"2026-11-21T10:00:00Z","session":"1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e03","detection":{"mode":"auto","player":"Player (CharacterBody2D)","deaths":"node_removal","levels":"scene","warnings":[]}}
+{"t":0,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":0,"type":"pos","p":[64.0,432.0,0]}
+{"t":2000,"type":"pos","p":[464.0,432.0,0]}
+{"t":2200,"type":"level_exit","level":"res://demo/sandbox.tscn"}
+{"t":2200,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":2200,"type":"pos","p":[64.0,432.0,0]}
+{"t":4000,"type":"pos","p":[424.0,432.0,0]}
+{"t":4200,"type":"level_exit","level":"res://demo/sandbox.tscn"}
+{"t":4200,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":4200,"type":"pos","p":[64.0,432.0,0]}
+{"t":6000,"type":"pos","p":[444.0,432.0,0]}
+{"t":6200,"type":"level_exit","level":"res://demo/sandbox.tscn"}
+{"t":6200,"type":"level_enter","level":"res://demo/sandbox.tscn"}
+{"t":6200,"type":"pos","p":[64.0,432.0,0]}
+{"t":9000,"type":"quit","p":[300.0,432.0,0]}

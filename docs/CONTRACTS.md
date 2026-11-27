@@ -34,7 +34,7 @@ Each session = one JSON Lines file. Line 1 is the header (`session_start`), then
 
 | type | Written when | Fields |
 | --- | --- | --- |
-| `session_start` | recorder start (header) | `schema`, `session` (UUID v4), `game`, `build`, `godot`, `platform`, `started_utc`, `detection` |
+| `session_start` | recorder start (header) | `schema`, `session` (UUID v4), `game`, `build`, `godot`, `platform`, `started_utc`, `detection` (`mode`, `player`, `deaths`, `levels`, `warnings`; D-029) |
 | `level_enter` / `level_exit` | level changes (auto or `level()`) | `level` |
 | `pos` | every 0.2 s if moved > 2 px (configurable) | `p` |
 | `death` | auto-detected or `death()` | `p`, `data.cause` (`"auto"` if detected) |

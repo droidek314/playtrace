@@ -14,3 +14,13 @@ Hand-written session files in schema v1 (see [docs/CONTRACTS.md](../../docs/CONT
 From `corrupt.jsonl` a reader must keep exactly 4 events (`level_enter`, `pos` at t=200, `pos` at t=1000 with its extra field ignored, `death`), drop the unknown `teleport` type and the 4 bad lines, and record one warning for the file.
 
 Changing these files is a contract change (spec section 0).
+
+## `setup_health/` (added 2026-11-27, D-029)
+
+Sessions that each trigger exactly one Setup health warning (T26). They live in a subfolder so `list_sessions("res://tests/fixtures")` still returns the six files above.
+
+| File | Warning it triggers | Why |
+| --- | --- | --- |
+| `no_player.jsonl` | `player_not_found` | `detection.player` is `""` (also listed in `detection.warnings`) |
+| `never_moved.jsonl` | `player_never_moved` | Player found, but all `pos` events are within 2 px of the first |
+| `reloads_without_deaths.jsonl` | `reloads_without_deaths` | The same level is entered 4 times (3 reloads) and there are 0 deaths |
