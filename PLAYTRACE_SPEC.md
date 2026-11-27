@@ -91,7 +91,7 @@ Install → enable plugin → press Play → heatmap with deaths. No code, no sc
 | Heatmap compute | CPU density grid, Gaussian kernel, via `WorkerThreadPool`. |
 | Heatmap colouring | `Gradient` → `Image` → `ImageTexture`, linear filtering. Default palette magma-like; viridis option. |
 | Local storage | JSON Lines, one file per session: `user://playtrace/sessions/<session_id>.jsonl`. Note: a game run from the editor and the editor itself share the same `user://` dir, so local mode needs no transport. |
-| Upload | Gzipped JSONL over HTTPS with `HTTPRequest` (works in web exports). On web tab hide, best-effort `navigator.sendBeacon` via `JavaScriptBridge`. |
+| Upload | Gzipped JSONL over HTTPS with `HTTPRequest` (works in web exports). On web tab hide, best-effort `fetch(..., {keepalive: true})` via `JavaScriptBridge` (D-017; `sendBeacon` cannot send the auth header). |
 | Server | .NET 10 LTS, ASP.NET Core minimal APIs, C#. |
 | Database | PostgreSQL + EF Core; events in a `jsonb` column. |
 | Deployment | Docker image + `docker compose` (server + Postgres). |
@@ -405,7 +405,7 @@ Merge rules:
 **M6 — Remote collection (WS-D server, WS-A uploader, WS-C fetch UI, WS-E e2e)**
 - [ ] Server per 6.4, Postgres, `docker compose up` works from a clean machine.
 - [ ] Uploader: background upload of finished sessions, retries with exponential backoff (max 1 h), keeps local copy until `201`/`200`.
-- [ ] Web builds upload (CORS) and use `sendBeacon` best effort on tab hide.
+- [ ] Web builds upload (CORS) and use `fetch` with `keepalive` best effort on tab hide (D-017).
 - [ ] Editor Fetch downloads new sessions into `user://playtrace/remote/<project>/`; dock shows local + remote identically.
 - [ ] Limits: 2 MB, rate limit, schema validation.
 - [ ] Playwright e2e passes (T35) (D-001).
@@ -556,6 +556,11 @@ These override anything above that disagrees. The same entries are in `docs/DECI
 | D-010 | The doc-snippet CI check (15.3) is added when USER_GUIDE / MANUAL_INTEGRATION exist; the link checker runs from M0. |
 | D-011 | No Docker locally: Docker-dependent work (image build, Testcontainers) runs in GitHub Actions. |
 | D-012 | The GitHub repo `droidek314/playtrace` is public, permanently. |
-| D-013 | `GET /v1/sessions` items use `levels: string[]`; `limit` default 100, max 500; `next` is null when there are no more items. See `docs/openapi.yaml`. |
+| D-013 | `GET /v1/sessions` items use `levels: string[]`; `limit` default 100, max 500 (out-of-range values are clamped). See `docs/openapi.yaml`. (`next` rule replaced by D-016.) |
 | D-014 | Doc ownership in Phase 1: editor agent owns `docs/HOW_IT_WORKS.md` (heatmap/overlay parts) and `docs/ARCHITECTURE.md` (editor parts); server agent owns `docs/SERVER.md`, `docs/SELF_HOSTING.md`; the lead owns the rest of `docs/`. |
 | D-015 | `demo/sandbox.tscn` is built by the lead together with the generator (moved from WS-E), so planted positions match the level. |
+| D-016 | `GET /v1/sessions` `next` is never null: the cursor after the last returned item, or the request's `since` (or `"0"`) when the page is empty. Clients page until `items` is empty and store the last `next` for the next Fetch. |
+| D-017 | Web tab-hide upload uses `fetch` with `keepalive: true` instead of `navigator.sendBeacon`, which cannot set `Authorization` / `Content-Encoding`. No HTTP contract change. |
+| D-018 | `outcome` everywhere (reader, server, editor) = whichever of `level_complete` / `quit` came last; `unknown` if neither. `duration_ms` = largest `t`. |
+| D-019 | Screenshot upload (M7) has no endpoint in 6.4 yet; a contract addition (e.g. `PUT /v1/sessions/{id}/screenshots/{n}.jpg`) is designed at the start of M7. |
+| D-020 | Server: keys are `pt_ingest_` / `pt_read_` + 32 random bytes (Base64url), stored as SHA-256 only; session ids unique per project; non-object event lines skipped, only a bad header gives 400; decompressed size capped at 16 MB (413); events stored as one `jsonb` array per session, so downloads have the same content but may differ in key order/spacing; migrations run on start. Details in `docs/SERVER.md`. |

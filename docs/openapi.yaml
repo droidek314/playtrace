@@ -107,8 +107,13 @@ paths:
                     items:
                       $ref: "#/components/schemas/SessionSummary"
                   next:
-                    type: [string, "null"]
-                    description: Cursor for the next page; null when there are no more items right now.
+                    type: string
+                    description: >
+                      Never null. Cursor after the last returned item; if the page is empty, the request's
+                      `since` (or "0"). Clients page until `items` is empty and keep the last `next` to
+                      fetch only newer sessions later (D-016).
+        "400":
+          description: Malformed `since` cursor.
         "401":
           description: Missing or wrong read key (ingest keys are rejected too).
   /v1/sessions/{id}:
@@ -175,6 +180,7 @@ components:
         outcome:
           type: string
           enum: [completed, quit, unknown]
+          description: Whichever of level_complete / quit came last; unknown if neither (same rule as PlaytraceSession.outcome()).
         deaths:
           type: integer
           minimum: 0
