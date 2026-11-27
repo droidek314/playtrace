@@ -41,7 +41,7 @@ func test_t17_top_death_hotspot_on_planted_cluster() -> void:
 
 func test_t18_unvisited_area_stays_cold() -> void:
 	var data := _load(1, 200)
-	var grid := PlaytraceDensityGrid.build(data.paths, 24.0, data.bounds)
+	var grid := PlaytraceDensityGrid.build_level(data, 16.0)
 	var r: Array = _gen.planted()["unvisited_area"]["rect"]
 	var rect := Rect2(r[0], r[1], r[2], r[3])
 	var hottest := 0.0
@@ -53,8 +53,9 @@ func test_t18_unvisited_area_stays_cold() -> void:
 
 
 func test_t19_golden_heatmap_image() -> void:
-	var result := PlaytraceHeatmapOverlay.compute(_load(1, 200), 24.0, PlaytraceHeatmapPalette.MAGMA)
+	var result := PlaytraceHeatmapOverlay.compute(_load(1, 200), 16.0, PlaytraceHeatmapPalette.MAGMA)
 	var image: Image = result["image"]
+	image.clear_mipmaps()
 	# To regenerate after an intended visual change: PLAYTRACE_UPDATE_GOLDEN=1, run this suite, commit the PNG.
 	if OS.get_environment("PLAYTRACE_UPDATE_GOLDEN") == "1":
 		image.save_png(ProjectSettings.globalize_path(GOLDEN))
@@ -63,6 +64,8 @@ func test_t19_golden_heatmap_image() -> void:
 	var golden := Image.load_from_file(ProjectSettings.globalize_path(GOLDEN))
 	golden.convert(Image.FORMAT_RGBA8)
 	assert_vector(Vector2(golden.get_size())).is_equal(Vector2(image.get_size()))
+	if golden.get_size() != image.get_size():
+		return
 	var a := image.get_data()
 	var b := golden.get_data()
 	var differing := 0
