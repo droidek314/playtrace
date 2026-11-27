@@ -30,7 +30,7 @@ public class IngestTests(PostgresFixture db)
         Assert.Equal(12400, item.GetProperty("duration_ms").GetInt64());
         Assert.Equal("completed", item.GetProperty("outcome").GetString());
         Assert.Equal(0, item.GetProperty("deaths").GetInt32());
-        Assert.Equal(JsonValueKind.Null, page.GetProperty("next").ValueKind);
+        Assert.Equal(JsonValueKind.String, page.GetProperty("next").ValueKind);
 
         var get = await db.Client(read).GetAsync($"/v1/sessions/{id}");
         Assert.Equal(HttpStatusCode.OK, get.StatusCode);
@@ -61,6 +61,20 @@ public class IngestTests(PostgresFixture db)
         var lines = Lines(await Gunzip(await db.Client(read).GetAsync($"/v1/sessions/{corruptId}")));
         Assert.Equal(6, lines.Length);
         Assert.Contains(lines, l => l.Contains("teleport"));
+    }
+
+    /// <summary>D-018: outcome is whichever of level_complete / quit came last.</summary>
+    [Fact]
+    public async Task Outcome_is_the_last_of_level_complete_and_quit()
+    {
+        var (ingest, read) = await db.CreateProjectAsync();
+        var text = Encoding.UTF8.GetString(PostgresFixture.Fixture("completed.jsonl")) + "{\"t\":13000,\"type\":\"quit\",\"p\":[1250.0,360.0,0]}\n";
+        var post = await db.Client(ingest).PostAsync("/v1/sessions", PostgresFixture.Upload(PostgresFixture.Gzip(Encoding.UTF8.GetBytes(text))));
+        Assert.Equal(HttpStatusCode.Created, post.StatusCode);
+
+        var item = Assert.Single((await db.Client(read).GetFromJsonAsync<JsonElement>("/v1/sessions")).GetProperty("items").EnumerateArray());
+        Assert.Equal("quit", item.GetProperty("outcome").GetString());
+        Assert.Equal(13000, item.GetProperty("duration_ms").GetInt64());
     }
 
     /// <summary>T30: bad schema/header/gzip → 400, too large → 413, bad key → 401; nothing is stored.</summary>
@@ -130,7 +144,13 @@ public class IngestTests(PostgresFixture db)
         Assert.NotNull(next);
         var second = await Page($"?limit=2&since={next}");
         Assert.Single(second.GetProperty("items").EnumerateArray());
-        Assert.Equal(JsonValueKind.Null, second.GetProperty("next").ValueKind);
+        // D-016: the last page still returns a cursor; using it gives no items and the same cursor.
+        var last = second.GetProperty("next").GetString();
+        Assert.NotNull(last);
+        var empty = await Page($"?limit=2&since={last}");
+        Assert.Empty(empty.GetProperty("items").EnumerateArray());
+        Assert.Equal(last, empty.GetProperty("next").GetString());
+        Assert.Equal("0", (await Page("?build=9.9.9")).GetProperty("next").GetString());
 
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/v1/sessions/{Guid.NewGuid()}")).StatusCode);
     }

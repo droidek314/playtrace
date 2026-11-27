@@ -45,8 +45,8 @@ public static class SessionEndpoints
 
     /// <summary>One page of the session list.</summary>
     /// <param name="Items">Sessions, oldest upload first.</param>
-    /// <param name="Next">Cursor for the next page, or null when there are no more items.</param>
-    public sealed record SessionPage(List<SessionSummary> Items, string? Next);
+    /// <param name="Next">Cursor after the last returned item; never null (D-016). Empty page: the request's <c>since</c>.</param>
+    public sealed record SessionPage(List<SessionSummary> Items, string Next);
 
     private static async Task<IResult> Upload(HttpRequest request, PlaytraceDb db, CancellationToken ct)
     {
@@ -115,14 +115,12 @@ public static class SessionEndpoints
             query = query.Where(s => s.Levels.Contains(level));
         if (build is not null)
             query = query.Where(s => s.Build == build);
-        var rows = await query.OrderBy(s => s.Seq).Take(take + 1)
+        var rows = await query.OrderBy(s => s.Seq).Take(take)
             .Select(s => new { s.Seq, Item = new SessionSummary(s.SessionId, s.Levels, s.Build, s.StartedUtc, s.DurationMs, s.Outcome, s.Deaths) })
             .ToListAsync(ct);
 
-        var more = rows.Count > take;
-        if (more)
-            rows.RemoveAt(take);
-        return Results.Ok(new SessionPage([.. rows.Select(r => r.Item)], more ? rows[^1].Seq.ToString() : null));
+        var next = rows.Count > 0 ? rows[^1].Seq : since ?? 0;
+        return Results.Ok(new SessionPage([.. rows.Select(r => r.Item)], next.ToString()));
     }
 
     private static async Task<IResult> Get(Guid id, HttpRequest request, HttpResponse response, PlaytraceDb db, CancellationToken ct)

@@ -23,7 +23,7 @@ server/
   tests/Playtrace.Server.Tests/
     HealthTests.cs               /health, no database needed
     PostgresFixture.cs           Testcontainers PostgreSQL + WebApplicationFactory host
-    IngestTests.cs               T29, T30, T33, list filters and paging
+    IngestTests.cs               T29, T30, T33, list filters and paging, outcome rule
     KeyAndRateLimitTests.cs      T31, T32, CORS
 ```
 
@@ -60,19 +60,19 @@ While parsing, `SessionParser` also computes the list summary:
 | `levels` | `level` of each `level_enter`, in order of first entry, no repeats |
 | `build`, `started_utc` | copied from the header (`""` if missing) |
 | `duration_ms` | the largest `t` of any event |
-| `outcome` | `completed` if there is a `level_complete` event, else `quit` if there is a `quit` event, else `unknown` |
+| `outcome` | whichever of `level_complete` (`completed`) or `quit` (`quit`) came last, else `unknown`; same rule as `PlaytraceSession.outcome()` (D-018) |
 | `deaths` | number of `death` events |
 
 ### List (`GET /v1/sessions`)
 
-Returns `{ "items": [...], "next": "<cursor>" | null }`, oldest upload first. Query parameters:
+Returns `{ "items": [...], "next": "<cursor>" }`, oldest upload first. Query parameters:
 
 - `since`: cursor from a previous `next`. The cursor is the `seq` of the last item returned (opaque to clients).
 - `level`: only sessions whose `levels` contain this id.
 - `build`: only sessions with this exact build.
 - `limit`: default 100, clamped to 1–500.
 
-The handler fetches `limit + 1` rows. If the extra row exists, `next` is set; otherwise `next` is `null`.
+`next` is never null (D-016): it is the cursor after the last returned item, or the request's `since` (`"0"` if none) when the page is empty. Clients page until `items` is empty and keep the last `next`, so the next Fetch gets only new sessions.
 
 ### Download (`GET /v1/sessions/{id}`)
 

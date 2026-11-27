@@ -33,7 +33,7 @@ public static class SessionParser
             var levels = new List<string>();
             long duration = 0;
             int deaths = 0;
-            bool completed = false, quit = false;
+            string outcome = "unknown";
             while (reader.ReadLine() is { } line)
             {
                 if (!TryParseObject(line, out var ev))
@@ -49,8 +49,8 @@ public static class SessionParser
                             levels.Add(level);
                             break;
                         case "death": deaths++; break;
-                        case "level_complete": completed = true; break;
-                        case "quit": quit = true; break;
+                        case "level_complete": outcome = "completed"; break;
+                        case "quit": outcome = "quit"; break;
                     }
                 }
                 if (events.Length > 1)
@@ -67,7 +67,8 @@ public static class SessionParser
                 StartedUtc = Str(h, "started_utc") ?? "",
                 Levels = [.. levels],
                 DurationMs = duration,
-                Outcome = completed ? "completed" : quit ? "quit" : "unknown",
+                // Whichever of level_complete / quit came last (D-018).
+                Outcome = outcome,
                 Deaths = deaths,
                 Header = headerLine,
                 Events = events.ToString(),
