@@ -19,7 +19,7 @@ A file-by-file guide for contributors. For how the parts fit together, see `ARCH
 | `demo/` | The sandbox level used by tests and the demo. |
 | `tools/` | The session generator and its ground truth. Not shipped to users. |
 | `tests/` | GdUnit4 suites and frozen fixtures. See [TESTING.md](TESTING.md). |
-| `server/` | Self-hostable ASP.NET Core server. See `SERVER.md` (written with M6). |
+| `server/` | Self-hostable ASP.NET Core server. See [SERVER.md](SERVER.md) and [SELF_HOSTING.md](SELF_HOSTING.md). |
 | `docs/` | All documentation. |
 
 ## `addons/playtrace/`
