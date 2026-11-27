@@ -51,13 +51,37 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: server/global.json
-      - run: dotnet test
+      - name: Migrations match the model
+        run: dotnet tool restore && dotnet ef migrations has-pending-model-changes --project src/Playtrace.Server
+        env:
+          ConnectionStrings__Playtrace: Host=localhost
+      # T29-T33 use Testcontainers (Docker is available on ubuntu runners).
+      - run: dotnet test --logger "console;verbosity=normal"
 
   docker-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
     steps:
       - uses: actions/checkout@v7
-      - run: docker build -t playtrace-server server
+      - run: docker build -t playtrace-server .
+      - name: docker compose smoke test (migrate, create-project, upload, list)
+        run: |
+          docker compose up -d --build
+          for i in $(seq 60); do curl -sf http://localhost:8080/health && break; sleep 2; done
+          out=$(docker compose exec -T server dotnet Playtrace.Server.dll create-project ci)
+          echo "$out" | sed 's/pt_[a-z]*_[A-Za-z0-9_-]*/<key>/g'
+          ingest=$(echo "$out" | grep -o 'pt_ingest_[A-Za-z0-9_-]*')
+          read=$(echo "$out" | grep -o 'pt_read_[A-Za-z0-9_-]*')
+          gzip -c ../tests/fixtures/completed.jsonl > /tmp/s.gz
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/v1/sessions \
+            -H "Authorization: Bearer $ingest" -H 'Content-Encoding: gzip' -H 'Content-Type: application/x-ndjson' \
+            --data-binary @/tmp/s.gz)
+          test "$code" = 201
+          curl -sf http://localhost:8080/v1/sessions -H "Authorization: Bearer $read" | grep -q 0b6f2c1e-4a8d-4c1b-9f3e-2a7d5c8e1f01
+      - if: failure()
+        run: docker compose logs
 
   docs-links:
     runs-on: ubuntu-latest
