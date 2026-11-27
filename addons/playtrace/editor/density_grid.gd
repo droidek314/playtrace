@@ -171,14 +171,19 @@ static func _count(point_sets: Array[PackedVector2Array]) -> int:
 	return n
 
 
-# Runs method(i) for i in 0..n-1 on the WorkerThreadPool (inline when n == 1) and waits.
-# High priority: the caller is usually itself a pool task waiting on these.
+# Runs method(i) for i in 0..n-1 and waits: piece 0 on the calling thread, the rest on the WorkerThreadPool.
+# The caller is usually itself a pool task, and a waiting pool thread does not pick up group work, so
+# handing all n pieces to the pool would leave one piece queued for a second round (measured: twice
+# the wall time). High priority, because the caller waits on these.
 func _parallel(method: Callable, n: int, label: String) -> void:
 	_parts.resize(n)
 	if n == 1:
 		method.call(0)
-	else:
-		WorkerThreadPool.wait_for_group_task_completion(WorkerThreadPool.add_group_task(method, n, -1, true, label))
+		return
+	var rest := func(i: int) -> void: method.call(i + 1)
+	var group := WorkerThreadPool.add_group_task(rest, n - 1, -1, true, label)
+	method.call(0)
+	WorkerThreadPool.wait_for_group_task_completion(group)
 
 
 # Concatenates the row bands in _parts into one grid and frees them.
@@ -248,14 +253,18 @@ func _bin_chunk(chunk: int) -> void:
 func _bin_level_chunk(chunk: int) -> void:
 	var local := PackedFloat32Array()
 	local.resize(width * height)
-	# Cell units shifted by half a cell, so int() gives the top-left of the 4 cells around a deposit.
-	var to_cells := Transform2D(0.0, Vector2.ONE / cell_size, 0.0, -origin / cell_size - Vector2(0.5, 0.5))
+	# Cell units. int() of a coordinate is its nearest cell; shifted by half a cell, int() is the cell
+	# before it and the fraction is the linear weight of the cell after it.
+	var to_cells := Transform2D(0.0, Vector2.ONE / cell_size, 0.0, -origin / cell_size)
+	var shift_x := Transform2D(0.0, Vector2.ONE, 0.0, Vector2(-0.5, 0.0)) * to_cells
+	var shift_y := Transform2D(0.0, Vector2.ONE, 0.0, Vector2(0.0, -0.5)) * to_cells
 	var spacing := PATH_SPACING_SIGMA * _sigma_px
 	var w := width
 	var n := _parts.size()
 	var s := chunk
 	while s < _sets.size():
-		var pts := to_cells * _sets[s]
+		var horizontal := _level.path_horizontal[s]
+		var pts := (shift_x if horizontal else shift_y) * _sets[s]
 		var segments := pts.size() - 1
 		if segments > 0 and _level.path_travel_s[s] > 0.0:
 			var k := (
@@ -270,17 +279,17 @@ func _bin_level_chunk(chunk: int) -> void:
 			# deposits that are a fixed distance apart into a repeating pattern, which shows as bright and
 			# dark beats along busy paths. Across the path, rounding only shifts it by under half a cell.
 			# (A full 2D bilinear splat costs twice as much and broke the T21 budget.)
-			if _level.path_horizontal[s]:
+			if horizontal:
 				for c: Vector2 in deposits:
 					var ix := int(c.x)
-					var i := int(c.y + 0.5) * w + ix
+					var i := int(c.y) * w + ix
 					var right := (c.x - ix) * wt
 					local[i] += wt - right
 					local[i + 1] += right
 			else:
 				for c: Vector2 in deposits:
 					var iy := int(c.y)
-					var i := iy * w + int(c.x + 0.5)
+					var i := iy * w + int(c.x)
 					var down := (c.y - iy) * wt
 					local[i] += wt - down
 					local[i + w] += down
@@ -289,7 +298,7 @@ func _bin_level_chunk(chunk: int) -> void:
 	var j := chunk
 	while j < stays.size():
 		var c := stays[j]
-		local[int(c.y + 0.5) * w + int(c.x + 0.5)] += _level.stay_seconds[j]
+		local[int(c.y) * w + int(c.x)] += _level.stay_seconds[j]
 		j += n
 	_parts[chunk] = local
 
