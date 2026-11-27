@@ -1,0 +1,11 @@
+{
+  "level": "res://demo/sandbox.tscn",
+  "bounds": [0, 0, 2048, 512],
+  "spawn": [64, 432],
+  "exit": [1960, 432],
+  "death_cluster": { "center": [912, 432], "radius": 16 },
+  "stuck_zone": { "center": [1540, 304], "radius": 12 },
+  "quit_point": { "center": [1180, 432], "radius": 24 },
+  "unvisited_area": { "rect": [1700, 80, 260, 180] },
+  "backtrack_loop": { "from": [1300, 360], "to": [1580, 304] }
+}

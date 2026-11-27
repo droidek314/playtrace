@@ -17,9 +17,9 @@ jobs:
           python-version: "3.12"
       - run: pip install gdtoolkit==4.5.0
       - name: gdlint
-        run: gdlint addons/playtrace tools tests
+        run: gdlint addons/playtrace tools tests demo
       - name: gdformat --check
-        run: gdformat --check --line-length 120 addons/playtrace tools tests
+        run: gdformat --check --line-length 120 addons/playtrace tools tests demo
 
   gdunit:
     runs-on: ubuntu-latest
