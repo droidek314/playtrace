@@ -1,66 +1,41 @@
 @tool
 class_name PlaytraceHeatmapToolbar
 extends HBoxContainer
-## Minimal M3 controls in the 2D editor toolbar: show/hide, opacity, kernel radius, palette, reload.
-##
-## Replaced by the Layers tab of the dock in M4. Uses only built-in controls, so it takes the editor theme.
+## The small Playtrace switch in the 2D editor toolbar: shows or hides all layers and says how many
+## sessions are shown. Everything else lives in the Playtrace bottom panel ([PlaytraceDock]).
+
+## Emitted when the switch is flipped (the plugin stores it).
+signal toggled_layers(on: bool)
 
 var _overlay: PlaytraceHeatmapOverlay
+var _switch := CheckButton.new()
 var _status := Label.new()
 
 
-## Connects the controls to [param overlay] and builds them.
+## Connects the switch to [param overlay].
 func setup(overlay: PlaytraceHeatmapOverlay) -> void:
 	_overlay = overlay
 	add_child(VSeparator.new())
-
-	var show := CheckButton.new()
-	show.text = "Playtrace"
-	show.button_pressed = overlay.enabled
-	show.tooltip_text = "Show playtest heatmap and deaths for this scene"
-	show.toggled.connect(func(on: bool) -> void: overlay.enabled = on)
-	add_child(show)
-
-	_add_slider("Opacity", 0.0, 100.0, overlay.opacity * 100.0, func(v: float) -> void: overlay.opacity = v / 100.0)
-	_add_slider("Radius", 4.0, 128.0, overlay.kernel_radius_px, func(v: float) -> void: overlay.kernel_radius_px = v)
-
-	var pal := OptionButton.new()
-	for n: String in PlaytraceHeatmapPalette.NAMES:
-		pal.add_item(n)
-	pal.selected = overlay.palette
-	pal.tooltip_text = "Heatmap colours"
-	pal.item_selected.connect(func(i: int) -> void: overlay.palette = i)
-	add_child(pal)
-
-	var reload := Button.new()
-	reload.flat = true
-	reload.tooltip_text = "Reload sessions"
-	reload.icon = EditorInterface.get_editor_theme().get_icon(&"Reload", &"EditorIcons")
-	reload.pressed.connect(overlay.reload)
-	add_child(reload)
-
+	_switch.text = "Playtrace"
+	_switch.button_pressed = overlay.enabled
+	_switch.tooltip_text = "Show playtest layers for this scene (settings: Playtrace panel at the bottom)"
+	_switch.toggled.connect(
+		func(on: bool) -> void:
+			overlay.enabled = on
+			toggled_layers.emit(on)
+	)
+	add_child(_switch)
 	add_child(_status)
 	overlay.changed.connect(_update_status)
+	overlay.data_changed.connect(_update_status)
 	_update_status()
 
 
-func _add_slider(label: String, lo: float, hi: float, value: float, on_change: Callable) -> void:
-	var l := Label.new()
-	l.text = label
-	add_child(l)
-	var s := HSlider.new()
-	s.min_value = lo
-	s.max_value = hi
-	s.value = value
-	s.custom_minimum_size.x = 80.0
-	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	s.tooltip_text = label
-	s.value_changed.connect(on_change)
-	add_child(s)
-
-
 func _update_status() -> void:
+	_switch.set_pressed_no_signal(_overlay.enabled)
 	if _overlay.level.is_empty():
 		_status.text = ""
+	elif _overlay.busy and _overlay.records.is_empty():
+		_status.text = "loading..."
 	else:
-		_status.text = "%d sessions · %d deaths" % [_overlay.session_count, _overlay.deaths.size()]
+		_status.text = "%d sessions · %d deaths" % [_overlay.data.session_count, _overlay.data.deaths.size()]

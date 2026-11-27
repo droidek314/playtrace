@@ -66,7 +66,7 @@ static func compute(data: PlaytraceLevelData, grid: PlaytraceDensityGrid, surfac
 	for r: Rect2 in unvisited_floors(grid, surfaces).slice(0, 3):
 		var c := {"pos": r.get_center(), "count": 0}
 		var item := _insight("unvisited", "Never visited: %d px of floor" % roundi(r.size.x), "", c, PackedInt32Array())
-		item["detail"] = "No player stood on this floor"
+		item["detail"] = "No player stood on this floor (x %d..%d, y %d)" % [r.position.x, r.end.x, r.end.y]
 		item["rect"] = r
 		out.append(item)
 	return out
