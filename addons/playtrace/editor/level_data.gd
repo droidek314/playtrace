@@ -35,6 +35,18 @@ var stay_points := PackedVector2Array()
 var stay_seconds := PackedFloat64Array()
 ## Death positions from all sessions.
 var deaths := PackedVector2Array()
+## For each death, the index of its session (0 .. [member session_count] - 1).
+var death_session := PackedInt32Array()
+## Positions of [code]stuck[/code] events.
+var stuck_points := PackedVector2Array()
+## Seconds of each stuck event ([code]data.seconds[/code]).
+var stuck_seconds := PackedFloat64Array()
+## For each stuck event, the index of its session.
+var stuck_session := PackedInt32Array()
+## Positions of [code]quit[/code] events.
+var quit_points := PackedVector2Array()
+## For each quit, the index of its session.
+var quit_session := PackedInt32Array()
 ## Number of sessions that entered the level.
 var session_count := 0
 ## Smallest rect holding every movement sample (lets the density grid skip a pass over the points).
@@ -55,6 +67,7 @@ func _init(level_id: String = "") -> void:
 ## the event that broke it; a path still open when the session ends, at the session's last event in the
 ## level (so the hesitation before a [code]quit[/code] counts). Other events are not part of the path.
 func add_session(events: Array) -> void:
+	var index := session_count
 	var inside := false
 	var entered := false
 	var last_t := 0.0
@@ -74,7 +87,12 @@ func add_session(events: Array) -> void:
 		if not inside:
 			continue
 		last_t = t
-		if type != PlaytraceSchema.POS and type != PlaytraceSchema.DEATH:
+		if (
+			type != PlaytraceSchema.POS
+			and type != PlaytraceSchema.DEATH
+			and type != PlaytraceSchema.STUCK
+			and type != PlaytraceSchema.QUIT
+		):
 			continue
 		var p: Variant = e.get("p")
 		if not p is Array or p.size() < 2 or not _is_number(p[0]) or not _is_number(p[1]):
@@ -82,6 +100,18 @@ func add_session(events: Array) -> void:
 		var v := Vector2(p[0], p[1])
 		if type == PlaytraceSchema.DEATH:
 			deaths.append(v)
+			death_session.append(index)
+			continue
+		if type == PlaytraceSchema.STUCK:
+			var data: Variant = e.get("data")
+			var secs: Variant = data.get("seconds") if data is Dictionary else null
+			stuck_points.append(v)
+			stuck_seconds.append(float(secs) if _is_number(secs) else 0.0)
+			stuck_session.append(index)
+			continue
+		if type == PlaytraceSchema.QUIT:
+			quit_points.append(v)
+			quit_session.append(index)
 			continue
 		if not _pts.is_empty() and _pts[-1].distance_to(v) > TELEPORT_PX_S * (t - _ts[-1]):
 			_end_path(t)  # teleport: the time before the jump was spent at the last sample
@@ -119,6 +149,35 @@ func add_path(points: PackedVector2Array, times: PackedFloat64Array) -> void:
 	path_travel_s.append(travel)
 	path_length_px.append(length)
 	path_horizontal.append(along.x >= along.y)
+
+
+## Appends everything of [param other] (for example one session's part) as the next sessions of this data.
+func merge(other: PlaytraceLevelData) -> void:
+	var base := session_count
+	paths.append_array(other.paths)
+	path_travel_s.append_array(other.path_travel_s)
+	path_length_px.append_array(other.path_length_px)
+	path_horizontal.append_array(other.path_horizontal)
+	stay_points.append_array(other.stay_points)
+	stay_seconds.append_array(other.stay_seconds)
+	deaths.append_array(other.deaths)
+	death_session.append_array(_shifted(other.death_session, base))
+	stuck_points.append_array(other.stuck_points)
+	stuck_seconds.append_array(other.stuck_seconds)
+	stuck_session.append_array(_shifted(other.stuck_session, base))
+	quit_points.append_array(other.quit_points)
+	quit_session.append_array(_shifted(other.quit_session, base))
+	session_count += other.session_count
+	if other._has_bounds:
+		bounds = bounds.merge(other.bounds) if _has_bounds else other.bounds
+		_has_bounds = true
+
+
+static func _shifted(indices: PackedInt32Array, by: int) -> PackedInt32Array:
+	var out := indices.duplicate()
+	for i in out.size():
+		out[i] += by
+	return out
 
 
 # Closes the open path at time end_t (never before its last sample) and starts a new one.
