@@ -1,0 +1,25 @@
+# Playtrace server + PostgreSQL. Skeleton in M0; the server starts using the database in M6.
+services:
+  server:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Playtrace: "Host=db;Database=playtrace;Username=playtrace;Password=${POSTGRES_PASSWORD:-playtrace}"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: playtrace
+      POSTGRES_USER: playtrace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-playtrace}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U playtrace"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
